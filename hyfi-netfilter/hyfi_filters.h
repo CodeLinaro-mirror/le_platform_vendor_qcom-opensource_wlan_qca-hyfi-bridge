@@ -66,7 +66,8 @@ static inline int hyfi_ieee1905_frame_filter(struct sk_buff *skb,
 {
 	if (unlikely(hyfi_is_ieee1905_pkt(skb))) {
 		u8 *data = (u8 *) eth_hdr(skb);
-		put_unaligned((u8) htonl(dev->ifindex),
+		u8 ifindex = (u8) (dev->ifindex);
+		put_unaligned(ifindex,
 				(u8 *) (data + sizeof(struct ethhdr) + 1));
 		return 1;
 	}
