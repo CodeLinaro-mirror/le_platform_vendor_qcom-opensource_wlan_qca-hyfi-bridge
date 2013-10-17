@@ -88,12 +88,14 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 
 			brdev = dev_get_by_name(&init_net, hymsghdr->if_name);
 			if (!brdev || !br || brdev != br->dev) {
-				printk("Not a Hy-Fi device, or device not found: %s\n",
-						hymsghdr->if_name);
-				hymsghdr->status = HYFI_STATUS_NOT_FOUND;
-				if (brdev)
-					dev_put(brdev);
-				break;
+				if (!(msgtype == HYFI_GET_FDB && brdev && (brdev->priv_flags & IFF_EBRIDGE))) {
+					printk("Not a Hy-Fi device, or device not found: %s\n",
+							hymsghdr->if_name);
+					hymsghdr->status = HYFI_STATUS_NOT_FOUND;
+					if (brdev)
+						dev_put(brdev);
+					break;
+				}
 			}
 
 			switch (msgtype) {
