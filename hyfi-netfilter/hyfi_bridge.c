@@ -383,7 +383,15 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 	struct net_hdtbl_entry *hd;
 	struct net_bridge_fdb_entry *dst;
 	u_int16_t seq = ~0;
-	const struct net_bridge *br = src->br;
+	const struct net_bridge *br;
+
+	if (src) {
+		/* Bridged interface */
+		br = src->br;
+	} else {
+		/* Routed interface */
+		br = netdev_priv(BR_INPUT_SKB_CB(*skb)->brdev);
+	}
 
 	if (unlikely(!br || !hyfi_br.dev || br->dev != hyfi_br.dev))
 		return NULL;
@@ -398,7 +406,7 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 	 * stream will be transmitted back on the same medium (if hyfi_tcp_sp
 	 * is enabled).
 	 */
-	if ((flag & IS_IPPROTO_TCP) && hyfi_tcp_sp(&hyfi_br) &&
+	if (src && (flag & IS_IPPROTO_TCP) && hyfi_tcp_sp(&hyfi_br) &&
 			!hyfi_portgrp_relay(hyfi_bridge_get_port(src)) &&
 			(hd = __hyfi_hdtbl_get(&hyfi_br, eth_hdr(*skb)->h_source))) {
 				hyfi_hatbl_update_local(&hyfi_br, hash,eth_hdr(*skb)->h_source,

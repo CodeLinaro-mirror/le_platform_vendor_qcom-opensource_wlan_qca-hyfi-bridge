@@ -404,15 +404,15 @@ struct net_hatbl_entry * hyfi_hatbl_create_tracked_entry(
 	struct net_hatbl_entry *ha;
 	struct net_bridge_fdb_entry *dst = __br_fdb_get(netdev_priv(br->dev), da);
 
-	if (!dst) {
-		return NULL ;
+	if (!dst || dst->is_local) {
+		return NULL;
 	}
 
 	ha = hatbl_create(br, hash, dst->dst, sa, da, da, sub_class, priority, 0);
 
 	if (!ha) {
 		printk(KERN_ERR"hyfi: Failed to allocate memory for entry\n");
-		return NULL ;
+		return NULL;
 	}
 
 	hyfi_ha_set_flag(ha, HYFI_HACTIVE_TBL_TRACKED_ENTRY);
@@ -429,7 +429,7 @@ struct net_hatbl_entry * hyfi_hatbl_create_aggr_entry(
 	struct net_hatbl_entry *ha;
 	struct net_bridge_fdb_entry *dst = __br_fdb_get(netdev_priv(br->dev), da);
 
-	if (!dst || ((seq >> 14) & 3) == 0) {
+	if (!dst || (((seq >> 14) & 3) == 0) || dst->is_local) {
 		return NULL ;
 	}
 
