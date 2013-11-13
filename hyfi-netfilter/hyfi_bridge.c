@@ -521,6 +521,7 @@ static int hyfi_bridge_deinit_bridge_device(void)
 	}
 
 	brnf_call_ebtables = 0;
+	br_dev->needed_headroom -= 80;
 
 	/* Multicast module detach to the bridge */
 	mc_detach(&hyfi_br);
@@ -560,7 +561,7 @@ static int hyfi_bridge_init_bridge_device(const char *br_name)
 	hyfi_br.flags = HYFI_BRIDGE_FLAG_MODE_RELAY_OVERRIDE
 			| HYFI_BRIDGE_FLAG_MODE_TCP_SP;
 
-	br_dev->hard_header_len += 80;
+	br_dev->needed_headroom += 80;
 
 	/* Init ports */
 	hyfi_bridge_ports_init(br_dev);
