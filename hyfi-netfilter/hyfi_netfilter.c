@@ -189,6 +189,19 @@ unsigned int hyfi_netfilter_pre_routing_hook(unsigned int hooknum,
 	struct hyfi_net_bridge_port *hyfi_p  = hyfi_bridge_get_port(br_port);
 	struct net_bridge_fdb_entry *dst;
 
+	if (unlikely(hyfi_is_ieee1901_pkt(skb) && hyfi_br)) {
+		struct sk_buff *skb2 = skb_clone(skb, GFP_ATOMIC);
+
+		if (skb2) {
+			memcpy(eth_hdr(skb2)->h_dest, hyfi_br->dev->dev_addr, ETH_ALEN);
+			skb2->pkt_type = PACKET_HOST;
+			skb2->dev = hyfi_br->dev;
+			netif_receive_skb(skb2);
+		}
+
+		return NF_DROP;
+	}
+
 	if (!hyfi_br || !br_port || !hyfi_p)
 		return NF_ACCEPT;
 

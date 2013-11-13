@@ -50,6 +50,17 @@ static inline int hyfi_is_ieee1905_pkt(struct sk_buff *skb)
 	return 0;
 }
 
+static inline int hyfi_is_ieee1901_pkt(struct sk_buff *skb)
+{
+	struct ethhdr *ethhdr = eth_hdr(skb);
+
+	if (unlikely(ethhdr->h_proto == htons(0x88E1))) {
+		return 1;
+	}
+
+	return 0;
+}
+
 static inline int hyfi_is_lldp_pkt(struct sk_buff *skb)
 {
 	struct ethhdr *ethhdr = eth_hdr(skb);
