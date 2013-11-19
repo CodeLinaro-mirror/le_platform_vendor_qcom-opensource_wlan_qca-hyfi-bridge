@@ -98,6 +98,7 @@ struct mld2_query {
 #define MC_HASH_SIZE        512
 #define MC_DEFAULT_DSCP     0x28
 #define MC_DSCP(x)          (x << 2)
+#define MC_GROUP_MAX        HYFI_MC_GROUP_MAX
 #define MC_SRC_GROUP_MAX    HYFI_MC_SRCS_MAX
 #define MC_RT_SRC_MAX       HYFI_MC_RT_SRCS_MAX
 #define MC_ENCAP_DEV_MAX    HYFI_MC_DEV_MAX
@@ -183,6 +184,7 @@ struct mc_struct {
     struct net_device       *dev;  /* bridge device */
     __be32                  enable;
     __be32                  started;
+    __be32                  active_group_count;
     struct hlist_head       hash[MC_HASH_SIZE];
     __be32                  debug;
     __be32                  forward_policy;
@@ -274,6 +276,7 @@ struct mc_fdb_group {
     int                     filter_mode; /* filter mode of host */
     struct mc_src_list      a; /* sources list of host */
     __u8                    mac[ETH_ALEN];
+    int 		    fdb_age_out;
 };
 
 enum {

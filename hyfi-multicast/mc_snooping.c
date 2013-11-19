@@ -361,7 +361,9 @@ static void mc_fdb_group_rcu_free(struct rcu_head *head)
 static void mc_fdb_group_destroy(struct mc_fdb_group *fg)
 {
     hlist_del_rcu(&fg->fslist);
-    atomic_dec(&fg->pg->mdb->users);
+
+    if (atomic_dec_and_test(&fg->pg->mdb->users))
+	    fg->pg->mdb->mc->active_group_count--;
         
     call_rcu(&fg->rcu, mc_fdb_group_rcu_free);
 
@@ -379,7 +381,9 @@ static struct mc_fdb_group *mc_fdb_group_create(struct mc_port_group *pg,
         memcpy(fg->mac, mac, ETH_ALEN);
         fg->ageing_timer = jiffies;
         hlist_add_head_rcu(&fg->fslist, &pg->fslist);
-        atomic_inc(&pg->mdb->users);
+
+	if (atomic_inc_return(&pg->mdb->users) == 1)
+	    fg->pg->mdb->mc->active_group_count++;
 
         mod_timer(&pg->mdb->mc->evtimer, jiffies + msecs_to_jiffies(MC_EVENT_DELAY_MS));
     }
@@ -549,6 +553,11 @@ static struct mc_mdb_entry *mc_mdb_create(struct mc_struct *mc,
 {
     struct mc_mdb_entry *mdb;
 
+    if (mc->active_group_count >= MC_GROUP_MAX) {
+	    MC_PRINT("%s: Snooping table is full!!\n", __func__);
+	    return NULL;
+    }
+
     mdb = kzalloc(sizeof *mdb, GFP_ATOMIC);
     if (mdb) {
         atomic_set(&mdb->users, 0);
@@ -683,6 +692,7 @@ static struct mc_fdb_group *mc_update_mdb(struct mc_struct *mc,
     /* Update all ageing timers */
     pg->ageing_timer = now;
     fg->ageing_timer = now;
+    fg->fdb_age_out = 0;
 
     return fg;
 }
@@ -2245,9 +2255,8 @@ void mc_fdb_change(__u8 *mac, int event)
                         continue;
 
                     hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
-                    	if (!compare_ether_addr(mac, fg->mac)) {
-                    		mc_fdb_group_destroy(fg);
-                    	}
+			if (!compare_ether_addr(mac, fg->mac))
+			    fg->fdb_age_out = 1;
                     }
                 }
             }

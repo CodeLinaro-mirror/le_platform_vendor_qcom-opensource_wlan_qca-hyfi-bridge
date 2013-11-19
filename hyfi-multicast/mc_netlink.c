@@ -231,7 +231,7 @@ static int mc_mdbtbl_fillbuf(struct mc_struct *mc, void *buf,
             struct mc_port_group *pg;
             struct hlist_node *pgh;
 
-            if (hlist_empty(&mdb->pslist))
+            if (!atomic_read(&mdb->users) || hlist_empty(&mdb->pslist))
                 continue;
 
             hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
@@ -265,7 +265,7 @@ static int mc_mdbtbl_fillbuf(struct mc_struct *mc, void *buf,
                     entry->ifindex = ((struct net_bridge_port *)pg->port)->dev->ifindex;
                     entry->filter_mode = fg->filter_mode;
                     entry->aging = jiffies_to_msecs(now - fg->ageing_timer) / 1000;
-                    entry->fdb_age_out = 0;
+                    entry->fdb_age_out = fg->fdb_age_out;
                     memcpy(entry->mac, mc_fdb_mac_get(fg), ETH_ALEN);
 
                     entry++;

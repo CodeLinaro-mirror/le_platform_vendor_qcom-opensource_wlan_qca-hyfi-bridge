@@ -242,7 +242,7 @@ static int hyfi_bridge_ports_init(struct net_device *br_dev)
 	dev = first_net_device(&init_net);
 	while (dev) {
 		struct net_bridge_port *br_port = hyfi_br_port_get(dev);
-		if (br_port) {
+		if (br_port && br_port->br) {
 		    if (br_port->br->dev == br_dev) {
                 /* Add to bridge port extended member */
                 hyfi_bridge_init_port(br_port);
