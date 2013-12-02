@@ -31,8 +31,9 @@ static void mc_acltbl_update(struct mc_struct *mc, void *param)
         pattern.rule = ar->pattern.rule;
         memcpy(pattern.mac, ar->pattern.mac, ETH_ALEN);
         memcpy(pattern.mac_mask, ar->pattern.mac_mask, ETH_ALEN);
-        pattern.ip.ip4 = htonl(*((__be32 *)ar->pattern.ip));
-        pattern.ip_mask.ip4_mask = htonl(*((__be32 *)ar->pattern.ip_mask));
+	/* Input value in network byte order which be converted from the string by inet_pton() */
+        pattern.ip.ip4 = *((__be32 *)ar->pattern.ip);
+        pattern.ip_mask.ip4_mask = *((__be32 *)ar->pattern.ip_mask);
 
         if (pattern.ip.ip4) {
             for (i = 0; i < mc->igmp_acl.pattern_count; i++) {
@@ -79,16 +80,17 @@ static void mc_acltbl_update(struct mc_struct *mc, void *param)
         pattern.rule = ar->pattern.rule;
         memcpy(pattern.mac, ar->pattern.mac, ETH_ALEN);
         memcpy(pattern.mac_mask, ar->pattern.mac_mask, ETH_ALEN);
+	/* Input value in network byte order which be converted from the string by inet_pton() */
         ipv6_addr_set(&pattern.ip.ip6, 
-                htonl(((struct in6_addr *)ar->pattern.ip)->s6_addr32[0]), 
-                htonl(((struct in6_addr *)ar->pattern.ip)->s6_addr32[1]), 
-                htonl(((struct in6_addr *)ar->pattern.ip)->s6_addr32[2]), 
-                htonl(((struct in6_addr *)ar->pattern.ip)->s6_addr32[3]));
+                ((struct in6_addr *)ar->pattern.ip)->s6_addr32[0],
+                ((struct in6_addr *)ar->pattern.ip)->s6_addr32[1],
+                ((struct in6_addr *)ar->pattern.ip)->s6_addr32[2],
+                ((struct in6_addr *)ar->pattern.ip)->s6_addr32[3]);
         ipv6_addr_set(&pattern.ip_mask.ip6_mask, 
-                htonl(((struct in6_addr *)ar->pattern.ip_mask)->s6_addr32[0]), 
-                htonl(((struct in6_addr *)ar->pattern.ip_mask)->s6_addr32[1]), 
-                htonl(((struct in6_addr *)ar->pattern.ip_mask)->s6_addr32[2]), 
-                htonl(((struct in6_addr *)ar->pattern.ip_mask)->s6_addr32[3]));
+                ((struct in6_addr *)ar->pattern.ip_mask)->s6_addr32[0],
+                ((struct in6_addr *)ar->pattern.ip_mask)->s6_addr32[1],
+                ((struct in6_addr *)ar->pattern.ip_mask)->s6_addr32[2],
+                ((struct in6_addr *)ar->pattern.ip_mask)->s6_addr32[3]);
 
         if (!ipv6_addr_any(&pattern.ip.ip6)) {
             for (i = 0; i < mc->mld_acl.pattern_count; i++) {

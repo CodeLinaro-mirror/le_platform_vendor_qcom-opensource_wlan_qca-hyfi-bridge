@@ -113,7 +113,7 @@ struct mld2_query {
 #ifdef MC_DEBUG
 #define MC_IP4_FMT(ip4)     (ip4)[0], (ip4)[1], (ip4)[2], (ip4)[3]
 #define MC_IP4_STR          "%d.%d.%d.%d"
-#define MC_IP6_FMT(ip6)     (ip6)[0], (ip6)[1], (ip6)[2], (ip6)[3], (ip6)[4], (ip6)[5], (ip6)[6], (ip6)[7]
+#define MC_IP6_FMT(ip6)     ntohs((ip6)[0]), ntohs((ip6)[1]), ntohs((ip6)[2]), ntohs((ip6)[3]), ntohs((ip6)[4]), ntohs((ip6)[5]), ntohs((ip6)[6]), ntohs((ip6)[7])
 #define MC_IP6_STR          "%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x"
 #define MC_MAC_FMT(addr)    (addr)[0], (addr)[1], (addr)[2], (addr)[3], (addr)[4], (addr)[5]
 #define MC_MAC_STR          "%02x:%02x:%02x:%02x:%02x:%02x"
