@@ -1537,12 +1537,13 @@ static int mc_ipv6_mld2_report(struct mc_struct *mc, struct sk_buff *skb)
         if (!nsrcs)
             return -EINVAL;
 
+	_nsrcs = ntohs(*nsrcs);
         if (unlikely(!pskb_may_pull(skb,
-                   len + sizeof(*grec) + sizeof(struct in6_addr) * (*nsrcs))))
+                   len + sizeof(*grec) + sizeof(struct in6_addr) * (_nsrcs))))
             return -EINVAL;
 
         grec = (struct mld2_grec *)(skb->data + len);
-        len += sizeof(*grec) + sizeof(struct in6_addr) * (*nsrcs);
+        len += sizeof(*grec) + sizeof(struct in6_addr) * (_nsrcs);
 
         MC_SKB_CB(skb)->type = MC_REPORT;
         if (mc_find_acl_rule(&mc->mld_acl, 0, (void *)&grec->grec_mca, 
