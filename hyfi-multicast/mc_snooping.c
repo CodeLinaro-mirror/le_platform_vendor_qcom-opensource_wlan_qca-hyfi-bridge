@@ -619,15 +619,12 @@ static struct mc_fdb_group *mc_update_hybrid_fdb_group(struct hlist_head *pslist
         if (hlist_empty(&pg->fslist)) 
             continue;
         
-        /* Find out the fdb whether in port list or not */
+	/* The IGMP/MLD Reports will be flooded to non-relay ports, it will cause the fdb's dst
+	 * being changed between different ports. If the fdb already be snoopped, do not create
+	 * a new fg, otherwise the source list will be cleared.
+	 */
         hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
             if (!compare_ether_addr(mac, fg->mac)) {
-                if (pg->port != port && 
-                		hyfi_bridge_portgrp_relay(port) &&
-                		hyfi_bridge_portgrp_relay((struct net_bridge_port *)pg->port)) {
-                    mc_fdb_group_destroy(fg);
-                    return NULL;
-                }
                 pg->ageing_timer = now;
                 fg->ageing_timer = now;
                 return fg;
