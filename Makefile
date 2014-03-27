@@ -56,6 +56,7 @@ $(TARGET)-objs := \
 	$(HYFI_NF)/hyfi_notify.o \
 	$(HYFI_NF)/hyfi_seamless.o \
 	$(HYFI_NF)/hyfi_aggr.o \
+	$(HYFI_NF)/hyfi_ecm.o \
 	$(HYFI_MC)/mc_main.o \
 	$(HYFI_MC)/mc_netlink.o \
 	$(HYFI_MC)/mc_netfilter.o \

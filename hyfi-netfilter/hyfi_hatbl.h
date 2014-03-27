@@ -22,7 +22,12 @@
 #define HYFI_HACTIVE_TBL_EXPIRE_TIME 120000  /* 120 sec */
 #define HYFI_HACTIVE_TBL_AGING_TIME  (1 << 14)  /* 16384 msec */
 
-#define HYFI_HACTIVE_TBL_STATIC_ENTRY   		(1 << 0)
+#define HYFI_HACTIVE_TBL_STATIC_ENTRY                       (1 << 0)
+#define HYFI_HACTIVE_TBL_SEAMLESS_ENABLED                   (1 << 1)
+#define HYFI_HACTIVE_TBL_TRACKED_ENTRY                      (1 << 2)
+#define HYFI_HACTIVE_TBL_AGGR_RX_ENTRY                      (1 << 3)
+#define HYFI_HACTIVE_TBL_AGGR_TX_ENTRY                      (1 << 4)
+#define HYFI_HACTIVE_TBL_ACCL_ENTRY							(1 << 5)
 
 #define HYFI_HACTIVE_TBL_PRIORITY_DSCP_VALID (1 << 31)
 #define HYFI_HACTIVE_TBL_PRIORITY_8021_VALID (1 << 30)
@@ -44,20 +49,17 @@ struct net_hatbl_entry {
 	u_int32_t create_time;
 	u_int32_t num_packets;
 	u_int32_t num_bytes;
+	u_int64_t prev_num_packets;
+	u_int64_t prev_num_bytes;
 	u_int8_t hash;
 	u_int8_t sub_class;
 	u_int8_t action; /* drop, throttle ... */
 	u_int8_t local; /* not created from HD */
 	u_int32_t priority;
 	u_int32_t flags;
+	u_int32_t ecm_serial;
 
 	struct ha_psw_stm_entry psw_stm_entry;
-
-#define HYFI_HACTIVE_TBL_SEAMLESS_ENABLED                   (1 << 1)
-#define HYFI_HACTIVE_TBL_TRACKED_ENTRY                      (1 << 2)
-#define HYFI_HACTIVE_TBL_AGGR_RX_ENTRY                      (1 << 3)
-#define HYFI_HACTIVE_TBL_AGGR_TX_ENTRY                      (1 << 4)
-
 	struct psw_flow_info psw_info;
 
 	spinlock_t aggr_lock;
@@ -108,6 +110,11 @@ static inline struct net_hatbl_entry* __hyfi_hatbl_get(
 	return NULL ;
 }
 
+/* No locks are taken, caller must lock ha-lock */
+struct net_hatbl_entry *hatbl_find(struct hyfi_net_bridge *br, u_int32_t hash,
+		const unsigned char *da, u_int32_t sub_class, u_int32_t priority);
+struct net_hatbl_entry *hatbl_find_ecm(struct hyfi_net_bridge *br, u_int32_t hash,
+		u_int32_t ecm_serial);
 extern int hyfi_hatbl_init(struct hyfi_net_bridge *br);
 extern void hyfi_hatbl_fini(struct hyfi_net_bridge *br);
 extern void hyfi_hatbl_flush(struct hyfi_net_bridge *br);

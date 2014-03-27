@@ -258,7 +258,9 @@ struct __hatbl_entry {
 	u_int32_t static_entry :1;
 	u_int32_t psw_use :1; /* Forward tracked packet to new interface */
 	u_int32_t aggr_entry :1; /* Aggregated entry */
+	u_int32_t accl_entry :1; /* Accelerated entry */
 
+	u_int32_t serial;	/* Serial number */
 	u_int32_t reserved; /* Reserved */
 };
 

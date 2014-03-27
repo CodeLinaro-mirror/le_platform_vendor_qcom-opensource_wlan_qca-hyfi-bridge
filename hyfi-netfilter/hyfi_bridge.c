@@ -304,6 +304,7 @@ static inline struct net_bridge_port *hyfi_bridge_handle_ha(struct net_hatbl_ent
 		}
 		ha->num_packets++;
 		ha->num_bytes += (*skb)->len;
+		hyfi_ha_clear_flag(ha, HYFI_HACTIVE_TBL_ACCL_ENTRY);
 
 		if (hyfi_br.path_switch_param.enable_path_switch
 				&& (ha->flags & HYFI_HACTIVE_TBL_SEAMLESS_ENABLED)) {

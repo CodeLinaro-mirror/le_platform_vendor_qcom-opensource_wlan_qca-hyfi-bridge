@@ -181,6 +181,15 @@ static void hatbl_fillbuf(struct net_hatbl_entry *ha, struct __hatbl_entry *hae)
 		hae->psw_enable = 1;
 	else
 		hae->psw_enable = 0;
+
+	if (hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_ACCL_ENTRY)) {
+		hae->accl_entry = 1;
+		hae->serial = ha->ecm_serial;
+	} else {
+		hae->accl_entry = 0;
+		hae->serial = 0;
+	}
+
 }
 
 int hyfi_hatbl_fillbuf(struct hyfi_net_bridge *br, void *buf, u_int32_t buf_len,
@@ -253,7 +262,7 @@ static inline struct net_hatbl_entry *hatbl_find_rcu(struct hlist_head *head,
 	return NULL ;
 }
 
-static inline struct net_hatbl_entry *hatbl_find(struct hlist_head *head,
+static inline struct net_hatbl_entry *__hatbl_find(struct hlist_head *head,
 		const u_int8_t *da, u_int32_t sub_class, u_int32_t priority)
 {
 	struct hlist_node *h;
@@ -262,6 +271,45 @@ static inline struct net_hatbl_entry *hatbl_find(struct hlist_head *head,
 	hlist_for_each_entry(ha, h, head, hlist) {
 		if ((ha->sub_class == sub_class) && (ha->priority == priority)
 				&& !compare_ether_addr(ha->da.addr, da)) {
+			ha->last_access = jiffies;
+			return ha;
+		}
+	}
+
+	return NULL ;
+}
+
+struct net_hatbl_entry *hatbl_find(struct hyfi_net_bridge *br, u_int32_t hash,
+		const unsigned char *da, u_int32_t sub_class, u_int32_t priority)
+{
+	struct hlist_node *h;
+	struct net_hatbl_entry *ha;
+
+	if(!br)
+		return NULL;
+
+	hlist_for_each_entry(ha, h, &br->hash_ha[hash], hlist) {
+		if ((ha->sub_class == sub_class) && (ha->priority == priority)
+				&& !compare_ether_addr(ha->da.addr, da)) {
+			ha->last_access = jiffies;
+			return ha;
+		}
+	}
+
+	return NULL ;
+}
+
+struct net_hatbl_entry *hatbl_find_ecm(struct hyfi_net_bridge *br, u_int32_t hash,
+		u_int32_t ecm_serial)
+{
+	struct hlist_node *h;
+	struct net_hatbl_entry *ha;
+
+	if(!br)
+		return NULL;
+
+	hlist_for_each_entry(ha, h, &br->hash_ha[hash], hlist) {
+		if (ha->ecm_serial == ecm_serial){
 			ha->last_access = jiffies;
 			return ha;
 		}
@@ -330,7 +378,7 @@ int hyfi_hatbl_addentry(struct hyfi_net_bridge *br, struct __hatbl_entry *hae)
 		}
 
 		spin_lock_bh(&br->hash_ha_lock);
-		ha = hatbl_find(head, hae->da, hae->sub_class, hae->priority);
+		ha = __hatbl_find(head, hae->da, hae->sub_class, hae->priority);
 		if (unlikely(ha)) {
 			hatbl_delete(br, ha);
 		}
@@ -512,7 +560,7 @@ int hyfi_hatbl_update(struct hyfi_net_bridge *br, struct __hatbl_entry *hae,
 	struct net_bridge_port *br_port;
 
 	spin_lock_bh(&br->hash_ha_lock);
-	ha = hatbl_find(head, hae->da, hae->sub_class, hae->priority);
+	ha = __hatbl_find(head, hae->da, hae->sub_class, hae->priority);
 
 	if (unlikely(!ha)) {
 		status = -ENOENT;
