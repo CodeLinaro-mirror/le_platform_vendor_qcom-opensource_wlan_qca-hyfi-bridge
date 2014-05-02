@@ -83,6 +83,8 @@ extern int hyfi_hdtbl_delete_byid(struct hyfi_net_bridge *br,
 		const unsigned char *id);
 extern struct net_hdtbl_entry *hyfi_hdtbl_get(struct hyfi_net_bridge *br,
 		const u_int8_t *addr);
+extern struct net_hdtbl_entry *hyfi_hdtbl_find(struct hyfi_net_bridge *br,
+		const u_int8_t *addr);
 extern void hyfi_hdtbl_delete_by_port(struct hyfi_net_bridge *br,
 		const struct net_bridge_port *p);
 

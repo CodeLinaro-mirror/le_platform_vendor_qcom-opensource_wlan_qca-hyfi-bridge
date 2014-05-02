@@ -145,7 +145,7 @@ static inline struct net_hdtbl_entry *hdtbl_find_rcu(struct hlist_head *head,
 	return NULL ;
 }
 
-static inline struct net_hdtbl_entry *hdtbl_find(struct hlist_head *head,
+static inline struct net_hdtbl_entry *__hdtbl_find(struct hlist_head *head,
 		const u_int8_t *addr)
 {
 	struct hlist_node *h;
@@ -157,6 +157,24 @@ static inline struct net_hdtbl_entry *hdtbl_find(struct hlist_head *head,
 			return hd;
 	}
 	return NULL ;
+}
+
+struct net_hdtbl_entry *hyfi_hdtbl_find(struct hyfi_net_bridge *br,
+		const u_int8_t *addr)
+{
+	struct hlist_node *h;
+	struct net_hdtbl_entry *hd;
+
+	if (!br || !addr)
+		return NULL;
+
+	hlist_for_each_entry(hd, h, &br->hash_hd[hdtbl_mac_hash(addr)], hlist) {
+		if (!compare_ether_addr(hd->addr.addr, addr)) {
+			return hd;
+		}
+	}
+
+	return NULL;
 }
 
 static struct net_hdtbl_entry *hdtbl_create(struct hlist_head *head,
@@ -291,12 +309,23 @@ int hyfi_hdtbl_update(struct hyfi_net_bridge *br, struct __hdtbl_entry *hde)
 			hde->udp_port);
 	struct net_device *dev_other = dev_get_by_index(dev_net(br->dev),
 			hde->other_port);
-	struct net_bridge_port *br_port_u = hyfi_br_port_get(dev_udp);
-	struct net_bridge_port *br_port_o = hyfi_br_port_get(dev_other);
+	struct net_bridge_port *br_port_u;
+	struct net_bridge_port *br_port_o;
+
+	if(!dev_udp || !dev_other) {
+		return -EINVAL;
+	}
+
+	br_port_u = hyfi_br_port_get(dev_udp);
+	br_port_o = hyfi_br_port_get(dev_other);
+
+	if(!br_port_u || !br_port_o) {
+		return -EINVAL;
+	}
 
 	spin_lock_bh(&br->hash_hd_lock);
 
-	hd = hdtbl_find(head, hde->mac_addr);
+	hd = __hdtbl_find(head, hde->mac_addr);
 	if (likely(hd)) {
 		/* fastpath: update of existing entry */
 		hd->dst_udp = br_port_u;

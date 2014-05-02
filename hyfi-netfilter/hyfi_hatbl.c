@@ -430,6 +430,38 @@ struct net_hatbl_entry* hyfi_hatbl_insert(struct hyfi_net_bridge *br,
 	return ha;
 }
 
+struct net_hatbl_entry* hyfi_hatbl_insert_ecm_classifier(struct hyfi_net_bridge *br,
+		u_int32_t hash, u_int32_t sub_class, struct net_hdtbl_entry *hd,
+		u_int32_t priority, const u_int8_t* sa, u_int32_t ecm_serial)
+{
+	struct net_hatbl_entry *ha = NULL;
+
+	spin_lock_bh(&br->hash_ha_lock);
+	do {
+		if (unlikely(br->ha_entry_cnt >= HYFI_HACTIVE_TBL_SIZE)) {
+			break;
+		}
+
+		ha = hatbl_create(br, hash,
+				sub_class == HYFI_TRAFFIC_CLASS_UDP ?
+						hd->dst_udp : hd->dst_other, sa, hd->addr.addr,
+				hd->id.addr, sub_class, priority,
+				hyfi_hd_has_flag(hd, HYFI_HDTBL_STATIC_ENTRY));
+
+	} while (false);
+
+	if (ha) {
+		ha->ecm_serial = ecm_serial;
+
+		hyfi_netlink_event_send(HYFI_EVENT_ADD_HA_ENTRY,
+				sizeof(struct __hatbl_entry), ha);
+	} else {
+		spin_unlock_bh(&br->hash_ha_lock);
+	}
+	return ha;
+}
+
+
 struct net_hatbl_entry * hyfi_hatbl_find_tracked_entry(
 		struct hyfi_net_bridge *br, u_int32_t hash, const u_int8_t *mac_addr,
 		u_int32_t sub_class, u_int32_t priority)
@@ -486,6 +518,8 @@ struct net_hatbl_entry * hyfi_hatbl_create_aggr_entry(
 
 	if (!ha) {
 		printk(KERN_ERR"hyfi: Failed to allocate memory for entry\n");
+
+		spin_unlock(&br->hash_ha_lock);
 		return NULL ;
 	}
 
