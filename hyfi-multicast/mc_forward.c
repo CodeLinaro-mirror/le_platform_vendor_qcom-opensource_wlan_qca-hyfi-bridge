@@ -191,7 +191,7 @@ static int mc_do_flood(struct mc_mdb_entry *mdb, struct sk_buff *skb, int forwar
     struct sk_buff *skb2;
     struct mc_struct *mc = mdb->mc;
 
-    if (mc->debug && printk_ratelimit()) {
+    if (unlikely(mc->debug && printk_ratelimit())) {
         if (mdb->group.pro == htons(ETH_P_IP)) {
             MC_PRINT("Flood the Group "MC_IP4_STR" to following interfaces:\n", 
                     MC_IP4_FMT((u8 *)(&mdb->group)));
@@ -199,13 +199,17 @@ static int mc_do_flood(struct mc_mdb_entry *mdb, struct sk_buff *skb, int forwar
             MC_PRINT("Flood the Group "MC_IP6_STR" to following interfaces:\n",
                     MC_IP6_FMT((__be16 *)(&mdb->group)));
         }
-        read_lock(&mdb->rwlock);
-        for (i = 0; i < mdb->flood_ifcnt; i++) {
-            struct net_device *dev = dev_get_by_index(&init_net, mdb->flood_ifindex[i]);
-            MC_PRINT("  -- %s\n", dev->name);
-            dev_put(dev);
-        }
-        read_unlock(&mdb->rwlock);
+
+		read_lock(&mdb->rwlock);
+		for (i = 0; i < mdb->flood_ifcnt; i++) {
+			struct net_device *dev = dev_get_by_index(&init_net, mdb->flood_ifindex[i]);
+
+			if (dev) {
+				MC_PRINT("  -- %s\n", dev->name);
+				dev_put(dev);
+			}
+		}
+		read_unlock(&mdb->rwlock);
     }
 
     read_lock(&mdb->rwlock);

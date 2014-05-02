@@ -1186,12 +1186,12 @@ int hyfi_psw_throttle(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
 	struct ha_psw_stm_entry *pha_psw_stm_entry;
 	u_int32_t quota = HYFI_PSW_DUP_BUF_FLUSH_QUOTA;
 
-	spin_lock(&pha_psw_stm_entry->throt_q_lock);
-
 	ha->num_packets--;
 	ha->num_bytes -= (*skb)->len;
 
 	pha_psw_stm_entry = &ha->psw_stm_entry;
+
+	spin_lock(&pha_psw_stm_entry->throt_q_lock);
 	skb_throt_q = &pha_psw_stm_entry->skb_throt_q;
 
 	hyfi_skb_track = TAILQ_FIRST( skb_throt_q );
@@ -1201,9 +1201,22 @@ int hyfi_psw_throttle(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
 		struct sk_buff *dup_skb;
 
 		if (pha_psw_stm_entry->throt_q_dup_buf_len) {
-			dup_skb = skb_copy(hyfi_skb_track->skb, GFP_ATOMIC );
+			dup_skb = skb_copy(hyfi_skb_track->skb, GFP_ATOMIC);
 
-			TAILQ_REMOVE( skb_throt_q, hyfi_skb_track, skb_track_qelem);
+			if (!dup_skb) {
+				/* Out of memory, flush queue */
+				while (hyfi_skb_track) {
+					TAILQ_REMOVE(skb_throt_q, hyfi_skb_track, skb_track_qelem);
+					kfree_skb(hyfi_skb_track->skb);
+					hyfi_skb_track = TAILQ_FIRST( skb_throt_q );
+				}
+
+				pha_psw_stm_entry->throt_q_len = 0;
+				pha_psw_stm_entry->throt_q_dup_buf_len = 0;
+				break;
+			}
+
+			TAILQ_REMOVE(skb_throt_q, hyfi_skb_track, skb_track_qelem);
 			kfree_skb(hyfi_skb_track->skb);
 
 			hyfi_skb_track = (struct hyfi_skb_track *) dup_skb->head;
@@ -1224,7 +1237,7 @@ int hyfi_psw_throttle(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
 			skb_pull(dup_skb, ETH_HLEN);
 		} else {
 			dup_skb = hyfi_skb_track->skb;
-			TAILQ_REMOVE( skb_throt_q, hyfi_skb_track, skb_track_qelem);
+			TAILQ_REMOVE(skb_throt_q, hyfi_skb_track, skb_track_qelem);
 		}
 
 		ha->num_packets++;
@@ -1252,28 +1265,24 @@ int hyfi_psw_throttle(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
 	}
 
 	if (hyfi_skb_track) {
-		if (*skb) {
-			struct sk_buff *pskb = *skb;
+		struct sk_buff *pskb = *skb;
 
-			hyfi_skb_track = (struct hyfi_skb_track *) pskb->head;
-			hyfi_skb_track->skb = pskb;
-			hyfi_skb_track->hyfi_pkt_path = pkt_path;
-			TAILQ_INSERT_TAIL( skb_throt_q, hyfi_skb_track, skb_track_qelem);
-			pha_psw_stm_entry->throt_q_len++;
-			*skb = NULL;
+		hyfi_skb_track = (struct hyfi_skb_track *) pskb->head;
+		hyfi_skb_track->skb = pskb;
+		hyfi_skb_track->hyfi_pkt_path = pkt_path;
+		TAILQ_INSERT_TAIL(skb_throt_q, hyfi_skb_track, skb_track_qelem);
+		pha_psw_stm_entry->throt_q_len++;
+		*skb = NULL;
 
-			spin_unlock(&pha_psw_stm_entry->throt_q_lock);
-			return 1;
-		}
+		spin_unlock(&pha_psw_stm_entry->throt_q_lock);
+		return 1;
 	} else {
 		pha_psw_stm_entry->throt_q_len = 0;
 		pha_psw_stm_entry->throt_q_dup_buf_len = 0;
 		pha_psw_stm_entry->dup_pkt_cnt = 0;
 
-		if (*skb) {
-			ha->num_packets++;
-			ha->num_bytes += (*skb)->len;
-		}
+		ha->num_packets++;
+		ha->num_bytes += (*skb)->len;
 	}
 
 	spin_unlock(&pha_psw_stm_entry->throt_q_lock);

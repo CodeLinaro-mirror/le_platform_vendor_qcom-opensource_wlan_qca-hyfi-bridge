@@ -176,7 +176,7 @@ static int hyfi_aggr_queue_pkt(struct net_hatbl_entry *ha, struct sk_buff **skb,
 		}
 	}
 
-	if (unlikely(idx == HYFI_AGGR_MAX_IFACES)) {
+	if (unlikely(idx >= HYFI_AGGR_MAX_IFACES)) {
 		/* Defensive check, in case there is no available queue (unlikely)
 		 * we should just finish here.
 		 */
@@ -412,12 +412,12 @@ struct net_bridge_port *hyfi_aggr_handle_tx_path(struct net_hatbl_entry *ha,
 
 		iface_info->packet_count = iface_info->packet_quota;
 		ha->aggr_seq_data.aggr_cur_iface++;
-		if (ha->aggr_seq_data.aggr_cur_iface == HYFI_AGGR_MAX_IFACE)
+		if (ha->aggr_seq_data.aggr_cur_iface >= HYFI_AGGR_MAX_IFACE)
 			ha->aggr_seq_data.aggr_cur_iface = 0;
 
 		while (ha->iface_info[ha->aggr_seq_data.aggr_cur_iface].packet_count == 0) {
 			ha->aggr_seq_data.aggr_cur_iface++;
-			if (ha->aggr_seq_data.aggr_cur_iface == HYFI_AGGR_MAX_IFACE) {
+			if (ha->aggr_seq_data.aggr_cur_iface >= HYFI_AGGR_MAX_IFACE) {
 				ha->aggr_seq_data.aggr_cur_iface = 0;
 
 				if (!aggr_end) {
@@ -532,7 +532,7 @@ int hyfi_aggr_update_flow(struct hyfi_net_bridge *br, struct __hatbl_entry *hae,
 		hyfi_psw_flush_track_q(&ha->psw_stm_entry);
 	}
 
-	if (ha->aggr_seq_data.aggr_cur_iface != HYFI_AGGR_MAX_IFACE) {
+	if (ha->aggr_seq_data.aggr_cur_iface < HYFI_AGGR_MAX_IFACE) {
 		cur_iface = ha->aggr_seq_data.aggr_cur_iface;
 	} else {
 		cur_iface = 0;

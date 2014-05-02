@@ -99,8 +99,11 @@ static void mc_acltbl_update(struct mc_struct *mc, void *param)
             }
         } else if (!is_zero_ether_addr(pattern.mac)) {
             for (i = 0; i < mc->mld_acl.pattern_count; i++) {
-                if (!memcmp(mc->mld_acl.patterns[i].mac, pattern.mac, 
-                        sizeof pattern - sizeof pattern.rule))
+            	u_int32_t pattern_size = sizeof pattern - sizeof pattern.rule;
+
+            	if (pattern_size > ETH_ALEN)
+            		pattern_size = ETH_ALEN;
+                if (!memcmp(mc->mld_acl.patterns[i].mac, pattern.mac, pattern_size))
                     break;
             }
         } else {
@@ -173,7 +176,7 @@ static int mc_acltbl_fillbuf(struct mc_struct *mc, void *buf,
         entry->pattern.rule = p[i].rule;
         memcpy(entry->pattern.mac, p[i].mac, ETH_ALEN);
         memcpy(entry->pattern.mac_mask, p[i].mac_mask, ETH_ALEN);
-        memcpy(entry->pattern.ip, &p[i].ip.ip4, sizeof(entry->pattern.ip));
+        memcpy(entry->pattern.ip, &p[i].ip.ip4, sizeof(__be32));
         memcpy(entry->pattern.ip_mask, &p[i].ip_mask.ip4_mask, sizeof(entry->pattern.ip_mask));
                     
         entry++;

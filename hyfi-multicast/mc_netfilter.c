@@ -31,8 +31,11 @@ static struct net_bridge_port *mc_br_port_get(int ifindex)
     struct net_bridge_port *bp = NULL;
 
     dev = dev_get_by_index(&init_net, ifindex);
-    bp = hyfi_br_port_get(dev);
-    dev_put(dev);
+
+    if (dev) {
+		bp = hyfi_br_port_get(dev);
+		dev_put(dev);
+    }
     return bp;
 }
 
@@ -132,7 +135,7 @@ HYFI_MC_STATIC unsigned int mc_forward_hook(unsigned int hooknum, struct sk_buff
         }
     } else if (mc->rp.type == MC_RTPORT_SPECIFY) {
         port = mc_br_port_get(mc->rp.ifindex);
-        if (port->dev != out)
+        if (!port || port->dev != out)
             goto drop;
     } else {
         goto drop;

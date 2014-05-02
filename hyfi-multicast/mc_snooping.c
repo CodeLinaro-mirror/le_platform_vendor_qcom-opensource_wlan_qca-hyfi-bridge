@@ -2277,11 +2277,17 @@ void mc_nbp_change(struct net_bridge_port *p, int event)
     struct hlist_node *h;
     struct mc_querier_entry *qe;
     int delay_reset = 0;
-    struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get(p->br);
-    struct mc_struct *mc = MC_DEV(hyfi_br);
+    struct hyfi_net_bridge *hyfi_br;
+    struct mc_struct *mc;
     int i;
 
-    if (!p || !p->br || !mc || event != RTM_DELLINK)
+    if (!p)
+    	return;
+
+    hyfi_br = hyfi_bridge_get(p->br);
+    mc = MC_DEV(hyfi_br);
+
+    if (!p->br || !mc || event != RTM_DELLINK)
         return;
 
     if (!mc->started)
@@ -2399,7 +2405,7 @@ int mc_open(struct hyfi_net_bridge *hyfi_br, struct mc_struct *mc)
 	struct net_bridge *br = netdev_priv(hyfi_br->dev);
 
     if (!mc) {
-        MC_PRINT(KERN_ERR "%s: mc module is not registered!\n", __func__);
+        printk(KERN_ERR "%s: mc module is not registered!\n", __func__);
         return -EINVAL;
     }
 
@@ -2430,7 +2436,7 @@ int mc_open(struct hyfi_net_bridge *hyfi_br, struct mc_struct *mc)
 int mc_stop(struct mc_struct *mc)
 {
     if (!mc) {
-        MC_PRINT(KERN_ERR "%s: mc module is not registered!\n", __func__);
+        printk(KERN_ERR "%s: mc module is not registered!\n", __func__);
         return -EINVAL;
     }
 

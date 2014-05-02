@@ -34,6 +34,9 @@ static int hyfi_device_event(struct notifier_block *unused, unsigned long event,
 	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get(HYFI_BRIDGE_ME);
 	u_int32_t device_event;
 
+	if (!hyfi_br)
+		return NOTIFY_DONE;
+
 	/* A bridge event */
 	if (!hyfi_bridge_dev_event(event, dev))
 		return NOTIFY_DONE;
