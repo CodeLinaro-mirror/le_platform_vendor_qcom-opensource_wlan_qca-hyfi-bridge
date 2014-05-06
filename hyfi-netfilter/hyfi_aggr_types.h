@@ -1,6 +1,3 @@
-/* Copyright (c) 2013, The Linux Foundation. All rights reserved. */
-/* Originally written by Qualcomm Atheros, Inc. */
-
 /*
  * Copyright (c) 2013, The Linux Foundation. All rights reserved.
  *
