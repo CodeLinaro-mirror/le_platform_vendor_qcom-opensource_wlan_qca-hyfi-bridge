@@ -32,7 +32,6 @@
 
 /* Default Linux bridge */
 static char hyfi_linux_bridge[IFNAMSIZ] = "";
-extern int brnf_call_ebtables;
 
 /* This parameter can be set from the insmod command line */
 MODULE_PARM_DESC(hyfi_linux_bridge, "Default Hy-Fi managed bridge");
@@ -529,7 +528,6 @@ static int hyfi_bridge_deinit_bridge_device(void)
 		return -1;
 	}
 
-	brnf_call_ebtables = 0;
 	br_dev->needed_headroom -= 80;
 
 	/* Multicast module detach to the bridge */
@@ -581,12 +579,6 @@ static int hyfi_bridge_init_bridge_device(const char *br_name)
 
 	/* Multicast module attach to the bridge */
 	mc_attach(&hyfi_br);
-
-	/* External variable exported by the bridge code.
-	 * It will not invoke any netfilter callback if this flag (or some other flags)
-	 * is not set.
-	 */
-	brnf_call_ebtables = 1;
 
 	printk(KERN_INFO"hyfi: Bridge %s is now attached\n", br_dev->name);
 
