@@ -472,13 +472,13 @@ void hyfi_netlink_event_send(u32 event_type, u32 event_len, void *event_data)
 		return;
 	}
 
-	skb = nlmsg_new(event_len, GFP_ATOMIC );
-	if (skb == NULL ) {
+	skb = nlmsg_new(event_len, gfp_any());
+	if (skb == NULL) {
 		printk(KERN_ERR "hyfi: skb == NULL event_type=%d\n", event_type);
 		return;
 	}
 	nlh = nlmsg_put(skb, br->event_pid, 0, event_type, event_len, 0);
-	if (nlh == NULL ) {
+	if (nlh == NULL) {
 		printk(KERN_ERR "hyfi: nlh == NULL event_type=%d\n", event_type);
 		return;
 	}
@@ -504,7 +504,6 @@ void hyfi_netlink_event_send(u32 event_type, u32 event_len, void *event_data)
 		memcpy(hae->id, ha->id.addr, ETH_ALEN);
 		hae->port_list[0].port = ha->dst->dev->ifindex;
 		hae->hash = ha->hash;
-
 		break;
 
 	case HYFI_EVENT_AGEOUT_HA_ENTRIES:
@@ -522,10 +521,9 @@ void hyfi_netlink_event_send(u32 event_type, u32 event_len, void *event_data)
 		break;
 
 	default:
-		printk("event type %d is not supported\n", event_type);
+		printk("hyfi: event type %d is not supported\n", event_type);
 		send_msg = false;
 		break;
-
 	}
 
 	if (send_msg) {

@@ -600,7 +600,7 @@ void mc_netlink_event_send(struct mc_struct *mc, u32 event_type, u32 event_len, 
             event_type >= HYFI_EVENT_MC_MAX)
         return;
 
-    if ((skb = nlmsg_new(event_len, GFP_ATOMIC)) == NULL) {
+    if ((skb = nlmsg_new(event_len, gfp_any())) == NULL) {
         MC_PRINT("nlmsg_new failed, event_type=%d\n", event_type);
         return;
     }
