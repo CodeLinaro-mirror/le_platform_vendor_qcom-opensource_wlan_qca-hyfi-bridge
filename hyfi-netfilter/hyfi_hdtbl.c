@@ -220,7 +220,7 @@ static int hdtbl_insert(struct hyfi_net_bridge *br,
 	if (!is_valid_ether_addr(addr))
 		return -EINVAL;
 
-	hd = hdtbl_find_rcu(head, addr);
+	hd = __hdtbl_find(head, addr);
 	if (hd) {
 		hdtbl_delete(hd);
 	}
@@ -300,7 +300,7 @@ int hyfi_hdtbl_delete(struct hyfi_net_bridge *br, const u_int8_t *addr)
 
 	spin_lock_bh(&br->hash_hd_lock);
 	head = &br->hash_hd[hdtbl_mac_hash(addr)];
-	hd = hdtbl_find_rcu(head, addr);
+	hd = __hdtbl_find(head, addr);
 
 	if (hd) {
 		hdtbl_delete(hd);

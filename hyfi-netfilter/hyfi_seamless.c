@@ -387,7 +387,7 @@ void path_switch_handle(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
 		// per stream path switch is disabled
 		if (ha->flags & HYFI_HACTIVE_TBL_SEAMLESS_ENABLED) {
 
-			spin_lock(&pha_psw_stm_entry->track_q_lock);
+			spin_lock_bh(&pha_psw_stm_entry->track_q_lock);
 			hyfi_skb_track = TAILQ_FIRST( skb_track_q );
 
 			// stream from enable to disable. Clean the tracking queue
@@ -397,7 +397,7 @@ void path_switch_handle(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
 				hyfi_skb_track = TAILQ_FIRST( skb_track_q );
 			}
 
-			spin_unlock(&pha_psw_stm_entry->track_q_lock);
+			spin_unlock_bh(&pha_psw_stm_entry->track_q_lock);
 			pha_psw_stm_entry->q_len = 0;
 		}
 		ha->flags &= ~HYFI_HACTIVE_TBL_SEAMLESS_ENABLED;
@@ -415,13 +415,14 @@ void path_switch_handle(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
 				__func__, ha->hash, pha_psw_stm_entry->buffered_port_type,
 				hyfi_portgrp_num(hyfi_bridge_get_port(dst)), pha_psw_stm_entry->q_len);
 
+		rcu_read_lock();
 		hyfi_psw_send_pkt(br, ha, HYFI_PSW_PKT_1, 0);
-		hyfi_psw_send_pkt(br, ha, HYFI_PSW_PKT_1, 0);
+		rcu_read_unlock();
 
 		if (pha_psw_stm_entry->q_len) {
 			struct hyfi_skb_track_q *skb_throt_q;
 
-			spin_lock(&pha_psw_stm_entry->track_q_lock);
+			spin_lock_bh(&pha_psw_stm_entry->track_q_lock);
 			skb_throt_q = &pha_psw_stm_entry->skb_throt_q;
 			hyfi_skb_track = TAILQ_FIRST( skb_track_q );
 
@@ -440,15 +441,17 @@ void path_switch_handle(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
 			pha_psw_stm_entry->dup_pkt_cnt = 0;
 			pha_psw_stm_entry->q_len = 0;
 
-			spin_unlock(&pha_psw_stm_entry->track_q_lock);
+			spin_unlock_bh(&pha_psw_stm_entry->track_q_lock);
 		} else {
+			rcu_read_lock();
 			hyfi_psw_send_pkt(br, ha, HYFI_PSW_PKT_2, 0);
+			rcu_read_unlock();
 		}
 	} else {
 		DPRINTK( "%s: Freeing %d duplicate packets from flow 0x%2x\n",
 				__func__, pha_psw_stm_entry->q_len, ha->hash);
 
-		spin_lock(&pha_psw_stm_entry->track_q_lock);
+		spin_lock_bh(&pha_psw_stm_entry->track_q_lock);
 
 		// tracked packet is not used to forward to a new interface.
 		hyfi_skb_track = TAILQ_FIRST( skb_track_q );
@@ -459,7 +462,7 @@ void path_switch_handle(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
 			hyfi_skb_track = TAILQ_FIRST( skb_track_q );
 		}
 
-		spin_unlock(&pha_psw_stm_entry->track_q_lock);
+		spin_unlock_bh(&pha_psw_stm_entry->track_q_lock);
 	}
 
 	pha_psw_stm_entry->q_len = 0;
@@ -1131,7 +1134,7 @@ int hyfi_psw_flush_buf_q(struct net_hatbl_entry *ha)
 	struct hyfi_skb_buf_q *skb_buf_q;
 	struct hyfi_skb_buffer *hyfi_skb_buffer;
 
-	spin_lock(&ha->psw_info.buf_q_lock);
+	spin_lock_bh(&ha->psw_info.buf_q_lock);
 	skb_buf_q = &ha->psw_info.skb_buf_q;
 	hyfi_skb_buffer = TAILQ_FIRST( skb_buf_q );
 
@@ -1142,7 +1145,7 @@ int hyfi_psw_flush_buf_q(struct net_hatbl_entry *ha)
 	}
 
 	ha->psw_info.buf_pkt = 0;
-	spin_unlock(&ha->psw_info.buf_q_lock);
+	spin_unlock_bh(&ha->psw_info.buf_q_lock);
 
 	return 0;
 }

@@ -50,7 +50,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 		hymsghdr->status = HYFI_STATUS_SUCCESS;
 		hymsgdata = HYFI_MSG_DATA(nlh);
 		msgtype = nlh->nlmsg_type;
-		//printk("recv skb from user space uid:%d pid:%d seq:%d, type:%d\n",uid,pid,seq,nlh->nlmsg_type);
+		//printk("recv skb from user space pid:%d seq:%d, type: 0x%03x\n",pid,seq,nlh->nlmsg_type);
 
 		do {
 			if (msgtype == HYFI_ATTACH_BRIDGE) {
@@ -251,18 +251,18 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 
 			case HYFI_SET_HATBL_AGING_PARAM: {
 				struct __aging_param *p = hymsgdata;
-				spin_lock( &br->lock);
+				spin_lock_bh(&br->lock);
 				br->hatbl_aging_time = p->aging_time;
-				spin_unlock( &br->lock);
+				spin_unlock_bh(&br->lock);
 
 				break;
 			}
 
 			case HYFI_SET_EVENT_PID: {
 				struct __event_info *p = hymsgdata;
-				spin_lock( &br->lock);
+				spin_lock_bh(&br->lock);
 				br->event_pid = p->event_pid;
-				spin_unlock( &br->lock);
+				spin_unlock_bh(&br->lock);
 				printk("hyfi: Initialized event process id %d\n", p->event_pid);
 				break;
 			}
@@ -312,12 +312,12 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 					hymsghdr->status = HYFI_STATUS_INVALID_PARAMETER;
 					break;
 				}
-				spin_lock( &br->lock);
+				spin_lock_bh(&br->lock);
 				if (*p == HYFI_BRIDGE_MODE_RELAY_OVERRIDE)
 					br->flags |= HYFI_BRIDGE_FLAG_MODE_RELAY_OVERRIDE;
 				else
 					br->flags &= ~HYFI_BRIDGE_FLAG_MODE_RELAY_OVERRIDE;
-				spin_unlock( &br->lock);
+				spin_unlock_bh(&br->lock);
 
 				break;
 			}
@@ -408,23 +408,22 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 
 			case HYFI_SET_BRIDGE_TCP_SP: {
 				u32 *p = hymsgdata;
-				spin_lock( &br->lock);
+				spin_lock_bh(&br->lock);
 				if (*p)
 					br->flags |= HYFI_BRIDGE_FLAG_MODE_TCP_SP;
 				else
 					br->flags &= ~HYFI_BRIDGE_FLAG_MODE_TCP_SP;
-				spin_unlock( &br->lock);
-
+				spin_unlock_bh( &br->lock);
 				break;
 			}
 
 			case HYFI_SET_PATHSWITCH_PARAM: {
 				struct __path_switch_param *p = hymsgdata;
-				spin_lock(&br->lock);
+				spin_lock_bh(&br->lock);
 				hyfi_psw_param_update(br, p);
-				spin_unlock(&br->lock);
-			}
+				spin_unlock_bh(&br->lock);
 				break;
+			}
 
 			case HYFI_SET_PSW_MSE_TIMEOUT:
 			case HYFI_SET_PSW_DEBUG:
@@ -432,9 +431,9 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 			case HYFI_SET_PSW_OLD_IF_QUIET_TIME:
 			case HYFI_SET_PSW_DUP_PKT_FLUSH_QUOTA: {
 				void *p = hymsgdata;
-				spin_lock(&br->lock);
+				spin_lock_bh(&br->lock);
 				hyfi_psw_adv_param_update(br, msgtype, p);
-				spin_unlock(&br->lock);
+				spin_unlock_bh(&br->lock);
 			}
 				break;
 
