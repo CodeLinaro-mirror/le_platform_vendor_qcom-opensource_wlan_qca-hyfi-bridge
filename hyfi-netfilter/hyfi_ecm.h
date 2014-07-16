@@ -22,14 +22,24 @@
 #include <linux/skbuff.h>
 #include <linux/types.h>
 
-/*
- * Notify about a new connection
- */
-int hyfi_ecm_new_connection(struct sk_buff *skb, u_int32_t ecm_serial, u_int32_t *hash);
+struct hyfi_ecm_flow_data_t {
+	u_int32_t ecm_serial;
+	u_int32_t hash;
+	u_int32_t flag;
+	u_int32_t priority;
+	u_int16_t seq;
+	u_int8_t da[6];
+	u_int8_t sa[6];
+};
 
 /*
  * Periodic stats updates
+ * returns:
+ * -1: error
+ * 0: okay
+ * 1: not interested
+ * 2: hy-fi not attached
  */
-int hyfi_ecm_update_stats(u_int32_t hash, u_int32_t ecm_serial, u_int64_t num_bytes, u_int64_t num_packets);
+int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int64_t num_bytes, u_int64_t num_packets);
 
 #endif /* HYFI_ECM_H_ */

@@ -27,7 +27,6 @@
 #include <linux/udp.h>
 #include <net/dsfield.h>
 #include "hyfi_api.h"
-#include "hyfi_hatbl.h"
 
 /* Convenience */
 #ifndef	HASHINIT
@@ -48,6 +47,17 @@
 #define IS_HYFI_AGGR_FLOW    (1 << 4)
 #define DSCP_SHIFT           2
 #define TCI_PRIORITY_SHIFT  13
+
+#ifndef HYFI_HYFI_HACTIVE_TBL_H_
+#define HYFI_HACTIVE_TBL_PRIORITY_DSCP_VALID (1 << 31)
+#define HYFI_HACTIVE_TBL_PRIORITY_DSCP_MASK  0x000001F8
+#define HYFI_HACTIVE_TBL_PRIORITY_8021_VALID (1 << 30)
+#define HYFI_HACTIVE_TBL_PRIORITY_8021_MASK  0x00000007
+#endif
+
+#ifndef IPPROTO_ETHERIP
+#define IPPROTO_ETHERIP (97)
+#endif
 
 /*
  * Return a 32-bit hash of the given buffer.  The init
