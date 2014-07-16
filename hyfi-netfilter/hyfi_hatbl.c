@@ -633,7 +633,9 @@ int hyfi_hatbl_update(struct hyfi_net_bridge *br, struct __hatbl_entry *hae,
 
 			DPRINTK("Sending switch end of flow x%d\n", i);
 			while (i--) {
+				rcu_read_lock();
 				hyfi_psw_send_pkt(br, ha, HYFI_PSW_PKT_3, 0);
+				rcu_read_unlock();
 			}
 		}
 
@@ -648,7 +650,9 @@ int hyfi_hatbl_update(struct hyfi_net_bridge *br, struct __hatbl_entry *hae,
 		if (if_change && br->path_switch_param.enable_switch_markers
 				&& !hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_AGGR_TX_ENTRY)) {
 			DPRINTK("Sending switch start of flow\n");
+			rcu_read_lock();
 			hyfi_psw_send_pkt(br, ha, HYFI_PSW_PKT_4, 0);
+			rcu_read_unlock();
 			pha_psw_stm_entry->mrk_id++;
 		}
 
