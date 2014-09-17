@@ -61,7 +61,8 @@ $(TARGET)-objs := \
 	$(HYFI_MC)/mc_netlink.o \
 	$(HYFI_MC)/mc_netfilter.o \
 	$(HYFI_MC)/mc_snooping.o \
-	$(HYFI_MC)/mc_forward.o
+	$(HYFI_MC)/mc_forward.o \
+	$(HYFI_MC)/mc_ecm.o
 
 else 
 

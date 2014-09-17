@@ -18,6 +18,7 @@
 
 #include <br_private.h>
 #include "mc_api.h"
+#include "mc_ecm.h"
 
 #ifdef HYBRID_MC_MLD
 #include <linux/in6.h>
@@ -133,6 +134,12 @@ struct mc_ip
     __be16      pro;
 };
 
+struct mc_glist_entry
+{
+    struct mc_ip group;
+    struct mc_glist_entry *next;
+};
+
 struct mc_querier_entry {
     struct hlist_node       rlist; /* attach to router port list */
     struct rcu_head         rcu;
@@ -219,6 +226,11 @@ struct mc_struct {
     unsigned long           ageing_query;
 
     __be32                  event_pid;
+
+    hyfi_bridge_ipv4_mc_update_callback_t ipv4_mc_update_cb;
+#ifdef HYBRID_MC_MLD
+    hyfi_bridge_ipv6_mc_update_callback_t ipv6_mc_update_cb;
+#endif
 };
 
 struct mc_rt_src_list {
