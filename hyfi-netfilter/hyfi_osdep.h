@@ -18,6 +18,30 @@
 #define HYFI_OSDEP_H_
 
 #include <linux/version.h>
+#include <linux/netfilter_bridge.h>
+
+static inline int hyfi_br_pass_frame_up(struct sk_buff *skb)
+{
+        struct net_device *indev, *brdev = BR_INPUT_SKB_CB(skb)->brdev;
+        struct net_bridge *br = netdev_priv(brdev);
+        struct br_cpu_netstats *brstats = this_cpu_ptr(br->stats);
+
+        u64_stats_update_begin(&brstats->syncp);
+        brstats->rx_packets++;
+        brstats->rx_bytes += skb->len;
+        u64_stats_update_end(&brstats->syncp);
+
+        indev = skb->dev;
+        skb->dev = brdev;
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0))
+        br_drop_fake_rtable(skb);
+#endif
+
+        return NF_HOOK(NFPROTO_BRIDGE, NF_BR_LOCAL_IN, skb, indev, NULL,
+                       netif_receive_skb);
+}
+
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0))
 #include <linux/moduleparam.h>

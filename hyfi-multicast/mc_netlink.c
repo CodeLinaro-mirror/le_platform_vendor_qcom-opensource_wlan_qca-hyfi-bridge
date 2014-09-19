@@ -663,6 +663,13 @@ static void mc_netlink_receive(struct sk_buff *__skb)
                     rcu_read_unlock();
                 }
                 break;
+            case HYFI_SET_MC_ROUTER:
+                {
+                    struct __mc_param_value *e = (struct __mc_param_value *)hymsgdata;
+                    hyfi_br->multicast_router = e->val;
+                    MC_PRINT(KERN_INFO "%s: %s multicast router.\n",__func__, e->val ? "Enable" : "Disable");
+                }
+                break;
             default:
                 MC_PRINT("mc: Unknown message type 0x%x\n", msgtype);
                 hymsghdr->status = HYFI_STATUS_INVALID_PARAMETER;
