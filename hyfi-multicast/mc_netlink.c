@@ -317,6 +317,74 @@ static void *mc_find_entry_by_mdb(struct mc_struct *mc, struct mc_mdb_entry *mdb
     return NULL;
 }
 
+/*call with rcu_read_lock()*/
+static void mc_group_list_add(struct mc_ip *pgroup, struct mc_glist_entry **ghead)
+{
+    struct mc_glist_entry *pge;
+
+    pge = kmalloc(sizeof(struct mc_glist_entry), GFP_ATOMIC);
+    if (!pge) {
+        printk("MC out-of-memory\n");
+        return;
+    }
+
+    memcpy(&pge->group, pgroup, sizeof(struct mc_ip));
+    pge->next = *ghead;
+    *ghead = pge;
+}
+
+static void mc_group_notify_one(struct mc_struct *mc, struct mc_ip *pgroup)
+{
+    struct net_device *brdev;
+
+    brdev = mc->dev;
+    if (!brdev)
+        return;
+
+    if (pgroup->pro == htons(ETH_P_IP))
+    {
+         hyfi_bridge_ipv4_mc_update_callback_t ipv4_mc_event_cb;
+         ipv4_mc_event_cb = hyfi_bridge_ipv4_mc_update_callback_get();
+         if (!ipv4_mc_event_cb)
+             return;
+
+         MC_PRINT("Group "MC_IP4_STR"  changed\n",  MC_IP4_FMT((u8 *)&pgroup->u.ip4));
+         ipv4_mc_event_cb(brdev, pgroup->u.ip4);
+    }
+#ifdef HYBRID_MC_MLD
+    else
+    {
+        hyfi_bridge_ipv6_mc_update_callback_t ipv6_mc_event_cb;
+        ipv6_mc_event_cb = hyfi_bridge_ipv6_mc_update_callback_get();
+        if (!ipv6_mc_event_cb)
+            return;
+
+        MC_PRINT("Group "MC_IP6_STR"  changed\n",  MC_IP6_FMT((__be16 *)&pgroup->u.ip6));
+        ipv6_mc_event_cb(brdev, &pgroup->u.ip6);
+    }
+#endif
+}
+
+
+/*call with lock-free*/
+static void mc_group_notify(struct mc_struct *mc, struct mc_glist_entry **ghead)
+{
+    struct mc_glist_entry *pge;
+    struct mc_glist_entry *prev;
+
+    pge = *ghead;
+    *ghead = NULL;
+
+    while(pge)
+    {
+        mc_group_notify_one(mc, &pge->group);
+        prev = pge;
+        pge = pge->next;
+        kfree(prev);
+    }
+
+}
+
 static void mc_set_psw_encap(struct mc_struct *mc, void *param, __be32 param_len)
 {
     int i, entry_cnt = param_len / sizeof(struct __mc_encaptbl_entry);
@@ -341,26 +409,40 @@ static void mc_set_psw_encap(struct mc_struct *mc, void *param, __be32 param_len
     }
 }
 
-static void mc_set_psw_flood(struct mc_struct *mc, void *param, __be32 param_len)
+static void mc_set_psw_flood(struct mc_struct *mc, void *param, __be32 param_len, struct mc_glist_entry **ghead)
 {
     int i, entry_cnt = param_len / sizeof(struct __mc_floodtbl_entry);
     struct __mc_floodtbl_entry *entry = param;
+    int    flood_ifcnt;
+    int    entry_changed;
 
     MC_PRINT("%s: Update flood table\n", __func__);
     for (i = 0; i < MC_HASH_SIZE; i++) {
         struct mc_mdb_entry *mdb;
         struct hlist_node *mdbh;
         hlist_for_each_entry_rcu(mdb, mdbh, &mc->hash[i], hlist) {
+            entry_changed = 0;
+
             write_lock_bh(&mdb->rwlock);
             if (entry_cnt && ((entry = mc_find_entry_by_mdb(mc, mdb, 
                                 sizeof(struct __mc_floodtbl_entry), param, param_len)) != NULL)) {
+                flood_ifcnt = mdb->flood_ifcnt;
                 mdb->flood_ifcnt = entry->ifcnt > MC_FLOOD_IF_MAX ? MC_FLOOD_IF_MAX : entry->ifcnt;
+                if (flood_ifcnt != mdb->flood_ifcnt ||
+                    memcmp(mdb->flood_ifindex, entry->ifindex, entry->ifcnt * sizeof(__be32)))
+                    entry_changed = 1;
                 memcpy(mdb->flood_ifindex, entry->ifindex, entry->ifcnt * sizeof(__be32));
             } else {
+                if( mdb->flood_ifcnt != 0)
+                    entry_changed = 1;
                 mdb->flood_ifcnt = 0;
                 memset(mdb->flood_ifindex, 0, sizeof(mdb->flood_ifindex));
             }
             write_unlock_bh(&mdb->rwlock);
+
+            if (entry_changed){
+                mc_group_list_add(&mdb->group, ghead);
+            }
         }
     }
 }
@@ -554,9 +636,13 @@ static void mc_netlink_receive(struct sk_buff *__skb)
                 break;
             case HYFI_SET_MC_PSW_FLOOD:
                 {
+                    struct mc_glist_entry *ghead = NULL;
                     rcu_read_lock();
-                    mc_set_psw_flood(mc, hymsgdata, hymsghdr->buf_len);
+                    mc_set_psw_flood(mc, hymsgdata, hymsghdr->buf_len, &ghead);
                     rcu_read_unlock();
+
+                    /*lock free callback*/
+                    mc_group_notify(mc, &ghead);
                 }
                 break;
            case HYFI_GET_MC_ACL:
