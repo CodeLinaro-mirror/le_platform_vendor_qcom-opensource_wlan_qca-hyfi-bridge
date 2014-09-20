@@ -56,6 +56,7 @@ struct hyfi_net_bridge {
 
 	struct path_switch_param path_switch_param;
 	void *mc;
+        unsigned char multicast_router;
 	struct list_head port_list;
 
 	struct net_device *dev;
@@ -93,6 +94,11 @@ static inline bool hyfi_portgrp_relay(const struct hyfi_net_bridge_port *p)
 {
 	return (!p || (p && p->group_type == HYFI_PORTGRP_TYPE_RELAY)) ?
 			true : false;
+}
+
+static inline bool hyfi_multicast_is_router(const struct hyfi_net_bridge *hyfi_br)
+{
+        return (hyfi_br->multicast_router > 0);
 }
 
 static inline u_int32_t hyfi_portgrp_num(const struct hyfi_net_bridge_port *p)

@@ -245,6 +245,7 @@ static int mc_convert(struct mc_struct *mc, struct sk_buff *skb, int forward)
     void *iph = NULL;
     struct sk_buff *skb2 = NULL;
     int is_management;
+    int passup = 0;
 
     eh = eth_hdr(skb);
     etype = ntohs(eh->h_proto);
@@ -295,12 +296,28 @@ static int mc_convert(struct mc_struct *mc, struct sk_buff *skb, int forward)
             goto out;
     }
 
+
+    if (forward) {
+        struct hyfi_net_bridge *hyfi_br;
+        hyfi_br = hyfi_bridge_get_by_dev(mc->dev);
+        if (hyfi_br &&
+                hyfi_multicast_is_router(hyfi_br)){
+            passup = 1;
+        }
+    }
+
     head = &mc->hash[mc_group_hash(mc->salt, group.u.ip4)];
     mdb = mc_mdb_find(head, &group);
     if (!mdb || !atomic_read(&mdb->users)) {
         if (mc->forward_policy == MC_POLICY_FLOOD || is_management)
             goto out;
-        kfree_skb(skb);
+
+        if (passup) {
+            /*multicast router is enabled, passing up for routing*/
+            hyfi_br_pass_frame_up(skb);
+        }
+        else
+            kfree_skb(skb);
         return 0;
     }
 
@@ -315,7 +332,19 @@ static int mc_convert(struct mc_struct *mc, struct sk_buff *skb, int forward)
         }
     }
 
-    mc_do_encap(mdb, iph, skb, forward);
+    if (mdb->encap_dev_cnt) {
+        if (!(skb2 = skb_clone(skb, GFP_ATOMIC)) ) {
+            kfree_skb(skb);
+            return 0;
+        }
+        mc_do_encap(mdb, iph, skb2, forward);
+    }
+
+
+    if (passup)
+            hyfi_br_pass_frame_up(skb);
+    else
+        kfree_skb(skb);
 
     return 0;
 out:

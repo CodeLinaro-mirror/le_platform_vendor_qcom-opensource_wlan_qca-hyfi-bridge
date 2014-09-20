@@ -43,6 +43,7 @@ enum
     HYFI_SET_MC_EVENT_PID,
     HYFI_GET_MC_ACL,
     HYFI_GET_MC_MDB,
+    HYFI_SET_MC_ROUTER
 };
 
 /* netlink event type */
