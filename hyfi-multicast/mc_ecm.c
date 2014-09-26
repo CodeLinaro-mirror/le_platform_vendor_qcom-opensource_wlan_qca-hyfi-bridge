@@ -28,14 +28,76 @@
 static hyfi_bridge_ipv4_mc_update_callback_t __rcu hyfi_ipv4_mc_event_cb = NULL;
 static hyfi_bridge_ipv6_mc_update_callback_t __rcu hyfi_ipv6_mc_event_cb = NULL;
 
+
+static int hyfi_bridge_if_source_filter(struct mc_mdb_entry *mdb, uint32_t ifindex, struct mc_ip *mc_source)
+{
+
+    struct mc_port_group *pg;
+    struct hlist_node *pgh;
+    int i;
+
+    /*no bridge port joining*/
+    if (hlist_empty(&mdb->pslist))
+        return 1;
+
+    hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
+        struct mc_fdb_group *fg;
+        struct hlist_node *fgh;
+
+        if (ifindex != ((struct net_bridge_port *)pg->port)->dev->ifindex)
+            continue;
+
+        /*no client joining*/
+        if (hlist_empty(&pg->fslist))
+            return 1;
+
+        /*anyone who would like to receive stream from the source*/
+        hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
+            if (!fg->filter_mode || (fg->filter_mode == HYFI_MC_EXCLUDE && !fg->a.nsrcs))
+                return 0;
+
+            if (fg->filter_mode == HYFI_MC_INCLUDE && !fg->a.nsrcs)
+                continue;
+
+            if (mdb->group.pro == htons(ETH_P_IP)) {
+                u_int32_t ip4 = mc_source->u.ip4;
+                u_int32_t *srcs = (u_int32_t *)fg->a.srcs;
+                for (i = 0; i < fg->a.nsrcs; i++) {
+                    if (srcs[i] == ip4)
+                        break;
+                }
+            }
+#ifdef HYBRID_MC_MLD
+            else {
+                struct in6_addr *ip6 = &mc_source->u.ip6;
+                struct in6_addr *srcs = (struct in6_addr *)fg->a.nsrcs;
+                for (i = 0; i < fg->a.nsrcs; i++) {
+                    if (!ipv6_addr_cmp(&srcs[i], ip6))
+                        break;
+                }
+            }
+#endif
+
+            if ((fg->filter_mode == HYFI_MC_INCLUDE && i != fg->a.nsrcs) ||
+                (fg->filter_mode == HYFI_MC_EXCLUDE && i == fg->a.nsrcs))
+                return 0;
+
+        }
+    }
+
+    return 1;
+
+}
+
 static int __hyfi_bridge_mc_get_ifs(struct net_device *brdev, struct mc_ip *mc_group,
-                                     uint32_t max_dst, uint32_t dst_dev[])
+                       struct mc_ip *mc_source, uint32_t max_dst, uint32_t dst_dev[])
 {
     struct hyfi_net_bridge *hyfi_br;
     struct mc_struct *mc;
     struct hlist_head *head;
     struct mc_mdb_entry *mdb;
     int i;
+    int ifnum;
 
     hyfi_br = hyfi_bridge_get_by_dev(brdev);
     if (!hyfi_br){
@@ -56,19 +118,34 @@ static int __hyfi_bridge_mc_get_ifs(struct net_device *brdev, struct mc_ip *mc_g
         return 0;
     }
 
-    if (max_dst < mdb->flood_ifcnt) {
-        MC_PRINT("Multicast interfaces overflow %d/%d\n", mdb->flood_ifcnt, max_dst);
-        return -1;
-    }
-
     read_lock(&mdb->rwlock);
-    for (i = 0; i < mdb->flood_ifcnt; i++) {
-        dst_dev[i] = mdb->flood_ifindex[i];
+    for (i = 0, ifnum = 0; i < mdb->flood_ifcnt; i++) {
+        if (hyfi_bridge_if_source_filter(mdb, mdb->flood_ifindex[i], mc_source))
+        {
+
+            if (mc_group->pro == htons(ETH_P_IP))
+                MC_PRINT("Group "MC_IP4_STR" Source "MC_IP4_STR"  ignored for port %d\n",
+                    MC_IP4_FMT((u8 *)&mc_group->u.ip4), MC_IP4_FMT((u8 *)&mc_source->u.ip4), mdb->flood_ifindex[i]);
+            else
+                MC_PRINT("Group "MC_IP6_STR" Source "MC_IP6_STR"  ignored for port %d\n",
+                    MC_IP6_FMT((__be16 *)&mc_group->u.ip6), MC_IP6_FMT((__be16 *)&mc_source->u.ip6), mdb->flood_ifindex[i]);
+
+            continue;
+        }
+
+        if ( ifnum + 1 > max_dst) {
+            MC_PRINT("Multicast interfaces overflow %d/%d\n", mdb->flood_ifcnt, max_dst);
+            ifnum = -1;
+            break;
+        }
+
+        dst_dev[ifnum] = mdb->flood_ifindex[i];
+        ifnum++;
+
     }
     read_unlock(&mdb->rwlock);
 
-
-    return mdb->flood_ifcnt;
+    return ifnum;
 
 }
 
@@ -76,11 +153,17 @@ int hyfi_bridge_ipv4_mc_get_if(struct net_device *brdev, __be32 origin, __be32 g
                                      uint32_t max_dst, uint32_t dst_dev[])
 {
     struct mc_ip mc_group;
+    struct mc_ip mc_source;
 
     memset(&mc_group, 0, sizeof(struct mc_ip));
     mc_group.u.ip4 = group;
     mc_group.pro = htons(ETH_P_IP);
-    return  __hyfi_bridge_mc_get_ifs(brdev, &mc_group, max_dst, dst_dev);
+
+    memset(&mc_source, 0, sizeof(struct mc_ip));
+    mc_source.u.ip4 = origin;
+    mc_source.pro = htons(ETH_P_IP);
+
+    return  __hyfi_bridge_mc_get_ifs(brdev, &mc_group, &mc_source, max_dst, dst_dev);
 }
 EXPORT_SYMBOL(hyfi_bridge_ipv4_mc_get_if);
 
@@ -120,11 +203,17 @@ int hyfi_bridge_ipv6_mc_get_if(struct net_device *brdev, struct in6_addr *origin
                                      uint32_t max_dst, uint32_t dst_dev[])
 {
     struct mc_ip mc_group;
+    struct mc_ip mc_source;
 
     memset(&mc_group, 0, sizeof(struct mc_ip));
     hyfi_ipv6_addr_copy(&mc_group.u.ip6, group);
     mc_group.pro = htons(ETH_P_IPV6);
-    return  __hyfi_bridge_mc_get_ifs(brdev, &mc_group, max_dst, dst_dev);
+
+    memset(&mc_source, 0, sizeof(struct mc_ip));
+    hyfi_ipv6_addr_copy(&mc_source.u.ip6, origin);
+    mc_source.pro = htons(ETH_P_IPV6);
+
+    return  __hyfi_bridge_mc_get_ifs(brdev, &mc_group, &mc_source, max_dst, dst_dev);
 }
 EXPORT_SYMBOL(hyfi_bridge_ipv6_mc_get_if);
 
