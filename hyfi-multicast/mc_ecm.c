@@ -82,6 +82,7 @@ int hyfi_bridge_ipv4_mc_get_if(struct net_device *brdev, __be32 origin, __be32 g
     mc_group.pro = htons(ETH_P_IP);
     return  __hyfi_bridge_mc_get_ifs(brdev, &mc_group, max_dst, dst_dev);
 }
+EXPORT_SYMBOL(hyfi_bridge_ipv4_mc_get_if);
 
 int hyfi_bridge_ipv4_mc_update_callback_register (hyfi_bridge_ipv4_mc_update_callback_t snoop_event_cb)
 {
@@ -98,6 +99,7 @@ int hyfi_bridge_ipv4_mc_update_callback_register (hyfi_bridge_ipv4_mc_update_cal
     rcu_assign_pointer(hyfi_ipv4_mc_event_cb, snoop_event_cb);
     return 0;
 }
+EXPORT_SYMBOL(hyfi_bridge_ipv4_mc_update_callback_register);
 
 int hyfi_bridge_ipv4_mc_update_callback_deregister(void)
 {
@@ -105,6 +107,8 @@ int hyfi_bridge_ipv4_mc_update_callback_deregister(void)
     return 0;
 
 }
+EXPORT_SYMBOL(hyfi_bridge_ipv4_mc_update_callback_deregister);
+
 
 hyfi_bridge_ipv4_mc_update_callback_t hyfi_bridge_ipv4_mc_update_callback_get(void)
 {
@@ -122,6 +126,7 @@ int hyfi_bridge_ipv6_mc_get_if(struct net_device *brdev, struct in6_addr *origin
     mc_group.pro = htons(ETH_P_IPV6);
     return  __hyfi_bridge_mc_get_ifs(brdev, &mc_group, max_dst, dst_dev);
 }
+EXPORT_SYMBOL(hyfi_bridge_ipv6_mc_get_if);
 
 int hyfi_bridge_ipv6_mc_update_callback_register (hyfi_bridge_ipv6_mc_update_callback_t snoop_event_cb)
 {
@@ -138,12 +143,14 @@ int hyfi_bridge_ipv6_mc_update_callback_register (hyfi_bridge_ipv6_mc_update_cal
     rcu_assign_pointer(hyfi_ipv6_mc_event_cb, snoop_event_cb);
     return 0;
 }
+EXPORT_SYMBOL(hyfi_bridge_ipv6_mc_update_callback_register);
 
 int hyfi_bridge_ipv6_mc_update_callback_deregister(void)
 {
     rcu_assign_pointer(hyfi_ipv6_mc_event_cb, NULL);
     return 0;
 }
+EXPORT_SYMBOL(hyfi_bridge_ipv6_mc_update_callback_deregister);
 
 hyfi_bridge_ipv6_mc_update_callback_t hyfi_bridge_ipv6_mc_update_callback_get(void)
 {
