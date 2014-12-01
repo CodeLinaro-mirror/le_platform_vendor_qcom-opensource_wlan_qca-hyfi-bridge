@@ -106,7 +106,7 @@ static inline struct net_hatbl_entry* __hyfi_hatbl_get(
 	struct hlist_node *h;
 	struct net_hatbl_entry *ha;
 
-	hlist_for_each_entry_rcu(ha, h, &br->hash_ha[hash], hlist)
+	os_hlist_for_each_entry_rcu(ha, h, &br->hash_ha[hash], hlist)
 	{
 		if ((ha->sub_class == sub_class) && (ha->priority == priority)
 				&& !compare_ether_addr(ha->da.addr, da)) {

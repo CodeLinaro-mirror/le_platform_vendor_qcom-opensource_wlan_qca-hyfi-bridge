@@ -69,7 +69,7 @@ static inline void hyfi_aggr_untag_packet(struct sk_buff *skb)
 	ip_send_check(iph);
 
 	/* Move Ethernet header and IP header 4 bytes forward */
-	memmove(skb->mac_header + HYFI_AGGR_HEADER_LEN, skb->mac_header,
+	memmove(skb_mac_header(skb) + HYFI_AGGR_HEADER_LEN, skb_mac_header(skb),
 			skb->mac_len + ihl);
 
 	/* Update pointers */
@@ -99,7 +99,7 @@ static inline void hyfi_aggr_tag_packet(struct net_hatbl_entry *ha,
 	skb_push(skb, HYFI_AGGR_HEADER_LEN);
 
 	/* Move Ethernet header and IP header 4 bytes backward */
-	memmove(skb->mac_header - HYFI_AGGR_HEADER_LEN, skb->mac_header,
+	memmove(skb_mac_header(skb) - HYFI_AGGR_HEADER_LEN, skb_mac_header(skb),
 			skb->mac_len + ihl);
 
 	skb_set_mac_header(skb, -(skb->mac_len));

@@ -39,9 +39,15 @@ static struct net_bridge_port *mc_br_port_get(int ifindex)
     return bp;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
+HYFI_MC_STATIC unsigned int mc_pre_routing_hook(const struct nf_hook_ops *ops, struct sk_buff *skb,
+        const struct net_device *in, const struct net_device *out,
+        int(*okfn)(struct sk_buff *))
+#else
 HYFI_MC_STATIC unsigned int mc_pre_routing_hook(unsigned int hooknum, struct sk_buff *skb,
         const struct net_device *in, const struct net_device *out,
         int(*okfn)(struct sk_buff *))
+#endif
 { 
 	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(in);
     struct mc_struct *mc = MC_DEV(hyfi_br);
@@ -93,9 +99,15 @@ out:
     return NF_ACCEPT;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
+HYFI_MC_STATIC unsigned int mc_forward_hook(const struct nf_hook_ops *ops, struct sk_buff *skb,
+        const struct net_device *in, const struct net_device *out,
+        int(*okfn)(struct sk_buff *))
+#else
 HYFI_MC_STATIC unsigned int mc_forward_hook(unsigned int hooknum, struct sk_buff *skb,
         const struct net_device *in, const struct net_device *out,
         int(*okfn)(struct sk_buff *))
+#endif
 { 
 	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(out);
     struct mc_struct *mc = MC_DEV(hyfi_br);
@@ -127,7 +139,7 @@ HYFI_MC_STATIC unsigned int mc_forward_hook(unsigned int hooknum, struct sk_buff
             struct mc_querier_entry *qe;
             struct hlist_node *h;
 
-            hlist_for_each_entry_rcu(qe, h, rhead, rlist) {
+            os_hlist_for_each_entry_rcu(qe, h, rhead, rlist) {
                 if (((struct net_bridge_port *)qe->port)->dev == out)
                     goto accept;
             }

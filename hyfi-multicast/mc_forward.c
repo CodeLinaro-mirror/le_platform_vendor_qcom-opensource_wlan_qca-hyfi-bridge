@@ -374,7 +374,7 @@ static int mc_process(const struct net_bridge_port *src, struct sk_buff *skb)
     if (!src)
         return mc_convert(mc, skb, 0);
 
-    fdb = __br_fdb_get(br, eth_hdr(skb)->h_source);
+    fdb = os_br_fdb_get(br, eth_hdr(skb)->h_source);
 
     if (!fdb)
         return -EINVAL;

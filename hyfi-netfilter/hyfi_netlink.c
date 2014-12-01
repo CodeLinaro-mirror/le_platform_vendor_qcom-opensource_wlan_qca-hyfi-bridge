@@ -41,7 +41,12 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 	struct __hybr_info brinfo;
 	struct net_bridge_port *br_port = NULL;
 
-	if ((skb = skb_get(__skb)) != NULL ) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0))
+        if ((skb = skb_clone(__skb, GFP_KERNEL)) != NULL)
+#else
+	if ((skb = skb_get(__skb)) != NULL )
+#endif
+        {
 		/* process netlink message pointed by skb->data */
 		nlh = nlmsg_hdr(skb);
 		pid = nlh->nlmsg_pid;
@@ -449,7 +454,11 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 
 		} while (false);
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0))
+		NETLINK_CB(skb).portid = 0; /* from kernel */
+#else
 		NETLINK_CB(skb).pid = 0; /* from kernel */
+#endif
 		NETLINK_CB(skb).dst_group = 0; /* unicast */
 		netlink_unicast(hyfi_nl_sk, skb, pid, MSG_DONTWAIT);
 	}
@@ -526,7 +535,11 @@ void hyfi_netlink_event_send(u32 event_type, u32 event_len, void *event_data)
 	}
 
 	if (send_msg) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0))
+		NETLINK_CB(skb).portid = 0; /* from kernel */
+#else
 		NETLINK_CB(skb).pid = 0; /* from kernel */
+#endif
 		NETLINK_CB(skb).dst_group = 0; /* unicast */
 		netlink_unicast(hyfi_nl_event_sk, skb, br->event_pid, MSG_DONTWAIT);
 	}
@@ -536,12 +549,22 @@ void hyfi_netlink_event_send(u32 event_type, u32 event_len, void *event_data)
 
 int __init hyfi_netlink_init( void )
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 6, 0))
+	struct netlink_kernel_cfg nlcfg;
+	memset(&nlcfg, 0, sizeof(nlcfg));
+	nlcfg.groups = 0;
+	nlcfg.input = hyfi_netlink_receive;
+	hyfi_nl_sk = netlink_kernel_create(&init_net,
+			NETLINK_QCA_HYFI,
+			&nlcfg);
+#else
 	hyfi_nl_sk = netlink_kernel_create(&init_net,
 			NETLINK_QCA_HYFI,
 			0,
 			hyfi_netlink_receive,
 			NULL,
 			THIS_MODULE);
+#endif
 
 	if (hyfi_nl_sk == NULL)
 	{
@@ -549,12 +572,22 @@ int __init hyfi_netlink_init( void )
 		return -ENODEV;
 	}
 
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 6, 0))
+	memset(&nlcfg, 0, sizeof(nlcfg));
+	nlcfg.groups = 0;
+	nlcfg.input = NULL;
+	hyfi_nl_event_sk = netlink_kernel_create(&init_net,
+			NETLINK_QCA_HYFI_EVENT,
+			&nlcfg);
+#else
 	hyfi_nl_event_sk = netlink_kernel_create(&init_net,
 			NETLINK_QCA_HYFI_EVENT,
 			0,
 			NULL,
 			NULL,
 			THIS_MODULE);
+#endif
 
 	if (hyfi_nl_event_sk == NULL)
 	{

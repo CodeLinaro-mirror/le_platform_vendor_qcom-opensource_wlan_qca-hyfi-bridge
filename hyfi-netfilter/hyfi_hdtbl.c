@@ -59,7 +59,7 @@ void hyfi_hdtbl_flush(struct hyfi_net_bridge *br)
 	for (i = 0; i < HD_HASH_SIZE; i++) {
 		struct net_hdtbl_entry *hd;
 		struct hlist_node *h, *n;
-		hlist_for_each_entry_safe(hd, h, n, &br->hash_hd[i], hlist)	{
+		os_hlist_for_each_entry_safe(hd, h, n, &br->hash_hd[i], hlist)	{
 			hdtbl_delete(hd);
 		}
 	}
@@ -74,7 +74,7 @@ struct net_hdtbl_entry *hyfi_hdtbl_get(struct hyfi_net_bridge *br,
 	struct hlist_node *h;
 	struct net_hdtbl_entry *hd;
 
-	hlist_for_each_entry_rcu(hd, h, &br->hash_hd[hdtbl_mac_hash(addr)], hlist) {
+	os_hlist_for_each_entry_rcu(hd, h, &br->hash_hd[hdtbl_mac_hash(addr)], hlist) {
 		if (!compare_ether_addr(hd->addr.addr, addr)) {
 			return hd;
 		}
@@ -101,7 +101,7 @@ int hyfi_hdtbl_fillbuf(struct hyfi_net_bridge *br, void *buf, u_int32_t buf_len,
 
 	rcu_read_lock();
 	for (i = 0; i < HD_HASH_SIZE; i++) {
-		hlist_for_each_entry_rcu(hd, h, &br->hash_hd[i], hlist)	{
+		os_hlist_for_each_entry_rcu(hd, h, &br->hash_hd[i], hlist)	{
 			if (num >= num_entries) {
 				ret = -EAGAIN;
 				goto out;
@@ -145,7 +145,7 @@ static inline struct net_hdtbl_entry *hdtbl_find_rcu(struct hlist_head *head,
 	struct hlist_node *h;
 	struct net_hdtbl_entry *hd;
 
-	hlist_for_each_entry_rcu(hd, h, head, hlist)
+	os_hlist_for_each_entry_rcu(hd, h, head, hlist)
 	{
 		if (!compare_ether_addr(hd->addr.addr, addr))
 			return hd;
@@ -159,7 +159,7 @@ static inline struct net_hdtbl_entry *__hdtbl_find(struct hlist_head *head,
 	struct hlist_node *h;
 	struct net_hdtbl_entry *hd;
 
-	hlist_for_each_entry(hd, h, head, hlist)
+	os_hlist_for_each_entry(hd, h, head, hlist)
 	{
 		if (!compare_ether_addr(hd->addr.addr, addr))
 			return hd;
@@ -176,7 +176,7 @@ struct net_hdtbl_entry *hyfi_hdtbl_find(struct hyfi_net_bridge *br,
 	if (!br || !addr)
 		return NULL;
 
-	hlist_for_each_entry(hd, h, &br->hash_hd[hdtbl_mac_hash(addr)], hlist) {
+	os_hlist_for_each_entry(hd, h, &br->hash_hd[hdtbl_mac_hash(addr)], hlist) {
 		if (!compare_ether_addr(hd->addr.addr, addr)) {
 			return hd;
 		}
@@ -280,7 +280,7 @@ int hyfi_hdtbl_delete_byid(struct hyfi_net_bridge *br, const u_int8_t *id)
 		struct net_hdtbl_entry *hd;
 		struct hlist_node *h, *n;
 
-		hlist_for_each_entry_safe(hd, h, n, &br->hash_hd[i], hlist)	{
+		os_hlist_for_each_entry_safe(hd, h, n, &br->hash_hd[i], hlist)	{
 			if (!compare_ether_addr(hd->id.addr, id))
 				hdtbl_delete(hd);
 		}
@@ -409,7 +409,7 @@ void hyfi_hdtbl_fini(struct hyfi_net_bridge *br)
 	for (i = 0; i < HD_HASH_SIZE; i++) {
 		struct net_hdtbl_entry *hd;
 		struct hlist_node *h, *n;
-		hlist_for_each_entry_safe(hd, h, n, &br->hash_hd[i], hlist)	{
+		os_hlist_for_each_entry_safe(hd, h, n, &br->hash_hd[i], hlist)	{
 			hlist_del_rcu(&hd->hlist);
 			kmem_cache_free(hyfi_hdtbl_cache, hd);
 		}

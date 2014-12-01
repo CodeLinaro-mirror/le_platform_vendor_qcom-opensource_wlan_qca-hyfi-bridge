@@ -526,7 +526,7 @@ void hyfi_psw_send_pkt(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
 	memcpy(ip_pkt->eh.h_source, br->dev->dev_addr, ETH_ALEN);
 	ip_pkt->eh.h_proto = htons(ETH_P_IP);
 
-	skb->network_header = (char *) &ip_pkt->ip;
+	skb_set_network_header(skb, offsetof(struct psw_ip_pkt, ip));
 	ip_pkt->ip.version = 4;
 	ip_pkt->ip.ihl = 5;
 	ip_pkt->ip.frag_off = 0;

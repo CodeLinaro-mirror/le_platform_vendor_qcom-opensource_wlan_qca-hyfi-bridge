@@ -232,21 +232,21 @@ static int mc_mdbtbl_fillbuf(struct mc_struct *mc, void *buf,
         struct mc_mdb_entry *mdb;
         struct hlist_node *mdbh;
 
-        hlist_for_each_entry_rcu(mdb, mdbh, &mc->hash[i], hlist) {
+        os_hlist_for_each_entry_rcu(mdb, mdbh, &mc->hash[i], hlist) {
             struct mc_port_group *pg;
             struct hlist_node *pgh;
 
             if (!atomic_read(&mdb->users) || hlist_empty(&mdb->pslist))
                 continue;
 
-            hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
+            os_hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
                 struct mc_fdb_group *fg;
                 struct hlist_node *fgh;
 
                 if (hlist_empty(&pg->fslist))
                     continue;
 
-                hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
+                os_hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
                     total++;
                     if (num >= num_entrys) {
                         ret = -EAGAIN;
@@ -394,7 +394,7 @@ static void mc_set_psw_encap(struct mc_struct *mc, void *param, __be32 param_len
     for (i = 0; i < MC_HASH_SIZE; i++) {
         struct mc_mdb_entry *mdb;
         struct hlist_node *mdbh;
-        hlist_for_each_entry_rcu(mdb, mdbh, &mc->hash[i], hlist) {
+        os_hlist_for_each_entry_rcu(mdb, mdbh, &mc->hash[i], hlist) {
             write_lock_bh(&mdb->rwlock);
             if (entry_cnt && ((entry = mc_find_entry_by_mdb(mc, mdb, 
                                 sizeof(struct __mc_encaptbl_entry), param, param_len)) != NULL)) {
@@ -420,7 +420,7 @@ static void mc_set_psw_flood(struct mc_struct *mc, void *param, __be32 param_len
     for (i = 0; i < MC_HASH_SIZE; i++) {
         struct mc_mdb_entry *mdb;
         struct hlist_node *mdbh;
-        hlist_for_each_entry_rcu(mdb, mdbh, &mc->hash[i], hlist) {
+        os_hlist_for_each_entry_rcu(mdb, mdbh, &mc->hash[i], hlist) {
             entry_changed = 0;
 
             write_lock_bh(&mdb->rwlock);
@@ -458,7 +458,11 @@ static void mc_netlink_receive(struct sk_buff *__skb)
     struct __hyctl_msg_header *hymsghdr;
     struct mc_struct *mc;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0))
+    if ((skb = skb_clone(__skb, GFP_KERNEL)) == NULL)
+#else
     if ((skb = skb_get(__skb)) == NULL)
+#endif
         return;
  
     /* process netlink message pointed by skb->data */
@@ -677,8 +681,12 @@ static void mc_netlink_receive(struct sk_buff *__skb)
             } /* switch */
         dev_put(brdev);
     } while(0);
-    
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0))
+    NETLINK_CB(skb).portid = 0; /* from kernel */
+#else
     NETLINK_CB(skb).pid = 0; /* from kernel */
+#endif
     NETLINK_CB(skb).dst_group = 0; /* unicast */
     netlink_unicast(mc_nl_sk, skb, pid, MSG_DONTWAIT);
 }
@@ -717,7 +725,11 @@ void mc_netlink_event_send(struct mc_struct *mc, u32 event_type, u32 event_len, 
     }
 
     if (send_msg) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0))
+        NETLINK_CB(skb).portid = 0; /* from kernel */
+#else
         NETLINK_CB(skb).pid = 0; /* from kernel */
+#endif
         NETLINK_CB(skb).dst_group = 0; /* unicast */
         netlink_unicast(mc_nl_event_sk, skb, mc->event_pid, MSG_DONTWAIT);
     }
@@ -725,20 +737,42 @@ void mc_netlink_event_send(struct mc_struct *mc, u32 event_type, u32 event_len, 
 
 int __init mc_netlink_init(void)
 {
-    if ((mc_nl_sk = netlink_kernel_create(&init_net,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 6, 0))
+    struct netlink_kernel_cfg nlcfg;
+    memset(&nlcfg, 0, sizeof(nlcfg));
+    nlcfg.groups = 0;
+    nlcfg.input = mc_netlink_receive;
+    mc_nl_sk = netlink_kernel_create(&init_net,
+            NETLINK_QCA_MC,
+            &nlcfg);
+#else
+    mc_nl_sk = netlink_kernel_create(&init_net,
             NETLINK_QCA_MC,
             0,
             mc_netlink_receive,
             NULL,
-            THIS_MODULE)) == NULL)
+            THIS_MODULE);
+#endif
+    if (mc_nl_sk == NULL)
         goto err;
 
-    if ((mc_nl_event_sk = netlink_kernel_create(&init_net,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 6, 0))
+    memset(&nlcfg, 0, sizeof(nlcfg));
+    nlcfg.groups = 0;
+    nlcfg.input = NULL;
+    mc_nl_event_sk = netlink_kernel_create(&init_net,
+            NETLINK_QCA_MC_EVENT,
+            &nlcfg);
+#else
+    mc_nl_event_sk = netlink_kernel_create(&init_net,
             NETLINK_QCA_MC_EVENT,
             0,
             NULL,
             NULL,
-            THIS_MODULE)) == NULL) {
+            THIS_MODULE);
+#endif
+    if (mc_nl_event_sk ==NULL)
+    {
         sock_release(mc_nl_sk->sk_socket);
         mc_nl_sk = NULL;
         goto err;

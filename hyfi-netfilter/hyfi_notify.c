@@ -36,7 +36,11 @@ static struct notifier_block hyfi_device_notifier = { .notifier_call =
 static int hyfi_device_event(struct notifier_block *unused, unsigned long event,
 		void *ptr)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0))
+	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
+#else
 	struct net_device *dev = ptr;
+#endif
 	struct net_bridge_port *p = hyfi_br_port_get(dev);
 	struct net_bridge *br;
 	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get(HYFI_BRIDGE_ME);
