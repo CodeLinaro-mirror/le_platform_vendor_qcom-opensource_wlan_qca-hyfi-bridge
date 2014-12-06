@@ -83,7 +83,7 @@ void hyfi_hatbl_cleanup(unsigned long _data)
 		struct net_hatbl_entry *ha;
 		struct hlist_node *h, *n;
 
-		hlist_for_each_entry_safe(ha, h, n, &br->hash_ha[i], hlist)	{
+		os_hlist_for_each_entry_safe(ha, h, n, &br->hash_ha[i], hlist)	{
 			this_timer = ha->last_access
 					+ msecs_to_jiffies(br->hatbl_aging_time);
 			if (time_before_eq(this_timer, jiffies)) {
@@ -114,7 +114,7 @@ void hyfi_hatbl_flush(struct hyfi_net_bridge *br)
 	for (i = 0; i < HA_HASH_SIZE; i++) {
 		struct net_hatbl_entry *ha;
 		struct hlist_node *h, *n;
-		hlist_for_each_entry_safe (ha, h, n, &br->hash_ha[i], hlist) {
+		os_hlist_for_each_entry_safe (ha, h, n, &br->hash_ha[i], hlist) {
 			hatbl_delete(br, ha);
 		}
 	}
@@ -214,7 +214,7 @@ int hyfi_hatbl_fillbuf(struct hyfi_net_bridge *br, void *buf, u_int32_t buf_len,
 	num_entries = buf_len / sizeof(struct __hatbl_entry);
 	rcu_read_lock();
 	for (i = 0; i < HA_HASH_SIZE; i++) {
-		hlist_for_each_entry_rcu(ha, h, &br->hash_ha[i], hlist)	{
+		os_hlist_for_each_entry_rcu(ha, h, &br->hash_ha[i], hlist)	{
 			if (hyfi_ha_has_flag(ha,
 					HYFI_HACTIVE_TBL_TRACKED_ENTRY
 							| HYFI_HACTIVE_TBL_AGGR_RX_ENTRY))
@@ -259,7 +259,7 @@ static inline struct net_hatbl_entry *hatbl_find_rcu(struct hlist_head *head,
 	struct hlist_node *h;
 	struct net_hatbl_entry *ha;
 
-	hlist_for_each_entry_rcu(ha, h, head, hlist) {
+	os_hlist_for_each_entry_rcu(ha, h, head, hlist) {
 		if ((ha->sub_class == sub_class) && (ha->priority == priority)
 				&& !compare_ether_addr(ha->da.addr, da)) {
 			ha->last_access = jiffies;
@@ -276,7 +276,7 @@ static inline struct net_hatbl_entry *__hatbl_find(struct hlist_head *head,
 	struct hlist_node *h;
 	struct net_hatbl_entry *ha;
 
-	hlist_for_each_entry(ha, h, head, hlist) {
+	os_hlist_for_each_entry(ha, h, head, hlist) {
 		if ((ha->sub_class == sub_class) && (ha->priority == priority)
 				&& !compare_ether_addr(ha->da.addr, da)) {
 			ha->last_access = jiffies;
@@ -296,7 +296,7 @@ struct net_hatbl_entry *hatbl_find(struct hyfi_net_bridge *br, u_int32_t hash,
 	if(!br)
 		return NULL;
 
-	hlist_for_each_entry(ha, h, &br->hash_ha[hash], hlist) {
+	os_hlist_for_each_entry(ha, h, &br->hash_ha[hash], hlist) {
 		if ((ha->sub_class == sub_class) && (ha->priority == priority)
 				&& !compare_ether_addr(ha->da.addr, da)) {
 			ha->last_access = jiffies;
@@ -316,7 +316,7 @@ struct net_hatbl_entry *hatbl_find_ecm(struct hyfi_net_bridge *br, u_int32_t has
 	if(!br)
 		return NULL;
 
-	hlist_for_each_entry(ha, h, &br->hash_ha[hash], hlist) {
+	os_hlist_for_each_entry(ha, h, &br->hash_ha[hash], hlist) {
 		if (ha->ecm_serial == ecm_serial){
 			ha->last_access = jiffies;
 			return ha;
@@ -490,7 +490,7 @@ struct net_hatbl_entry * hyfi_hatbl_create_tracked_entry(
 		const u_int8_t *da, u_int32_t sub_class, u_int32_t priority)
 {
 	struct net_hatbl_entry *ha;
-	struct net_bridge_fdb_entry *dst = __br_fdb_get(netdev_priv(br->dev), da);
+	struct net_bridge_fdb_entry *dst = os_br_fdb_get(netdev_priv(br->dev), da);
 
 	if (!dst || dst->is_local) {
 		return NULL;
@@ -515,7 +515,7 @@ struct net_hatbl_entry * hyfi_hatbl_create_aggr_entry(
 		u_int16_t seq)
 {
 	struct net_hatbl_entry *ha;
-	struct net_bridge_fdb_entry *dst = __br_fdb_get(netdev_priv(br->dev), da);
+	struct net_bridge_fdb_entry *dst = os_br_fdb_get(netdev_priv(br->dev), da);
 
 	if (!dst || (((seq >> 14) & 3) == 0) || dst->is_local) {
 		return NULL ;
@@ -779,7 +779,7 @@ void hyfi_hatbl_fini(struct hyfi_net_bridge *br)
 	for (i = 0; i < HA_HASH_SIZE; i++) {
 		struct net_hatbl_entry *ha;
 		struct hlist_node *h, *n;
-		hlist_for_each_entry_safe (ha, h, n, &br->hash_ha[i], hlist) {
+		os_hlist_for_each_entry_safe (ha, h, n, &br->hash_ha[i], hlist) {
 			br->ha_entry_cnt--;
 			hlist_del_rcu(&ha->hlist);
 

@@ -435,7 +435,7 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 	} else if ((hd = __hyfi_hdtbl_get(&hyfi_br, eth_hdr(*skb)->h_dest))) {
 		/* Create a new entry based on H-Default table */
 		return hyfi_bridge_handle_hd(hd, skb, hash, traffic_class, priority);
-	} else if ((dst = __br_fdb_get((struct net_bridge *)br, eth_hdr(*skb)->h_dest)) && !dst->is_local) {
+	} else if ((dst = os_br_fdb_get((struct net_bridge *)br, eth_hdr(*skb)->h_dest)) && !dst->is_local) {
         hyfi_hatbl_insert_from_fdb(&hyfi_br, hash, dst->dst, eth_hdr(*skb)->h_source,
                 eth_hdr(*skb)->h_dest, br->dev->dev_addr,
                 traffic_class, priority);

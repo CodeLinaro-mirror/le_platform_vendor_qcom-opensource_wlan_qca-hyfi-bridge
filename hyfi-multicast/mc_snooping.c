@@ -172,7 +172,11 @@ static struct sk_buff *mc_ipv6_alloc_query(struct mc_struct *mc,
     hopopt[4] = 0;                        /* Type = 0x0000 (MLD) */
     hopopt[5] = 0;
     hopopt[6] = IPV6_TLV_PADN;            /* PadN */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 6, 0))
+    hopopt[7] = IPV6_TLV_PAD1;            /* Pad1 */
+#else
     hopopt[7] = IPV6_TLV_PAD0;            /* Pad0 */
+#endif
 
     skb_put(skb, sizeof(*ip6h) + 8);
 
@@ -272,7 +276,7 @@ static void mc_ipv4_rp_reset(struct mc_struct *mc, struct mc_router_port *rp)
     if (hlist_empty(&rp->igmp_rlist))
         return;
 
-    hlist_for_each_entry_rcu(qe, h, &rp->igmp_rlist, rlist) {
+    os_hlist_for_each_entry_rcu(qe, h, &rp->igmp_rlist, rlist) {
         if (!rp->igmp_root_qe ||
                 ntohl(rp->igmp_root_qe->sip.u.ip4) > ntohl(qe->sip.u.ip4))
             rp->igmp_root_qe = qe;
@@ -289,7 +293,7 @@ static void mc_ipv6_rp_reset(struct mc_struct *mc, struct mc_router_port *rp)
     if (hlist_empty(&rp->mld_rlist))
         return;
 
-    hlist_for_each_entry_rcu(qe, h, &rp->mld_rlist, rlist) {
+    os_hlist_for_each_entry_rcu(qe, h, &rp->mld_rlist, rlist) {
         if (!rp->mld_root_qe || 
                 ipv6_addr_cmp(&rp->mld_root_qe->sip.u.ip6, &qe->sip.u.ip6) > 0)
             rp->mld_root_qe = qe;
@@ -302,7 +306,7 @@ static struct mc_querier_entry *mc_querier_entry_find(struct hlist_head *head, v
     struct hlist_node *h;
     struct mc_querier_entry *qe;
 
-    hlist_for_each_entry_rcu(qe, h, head, rlist) {
+    os_hlist_for_each_entry_rcu(qe, h, head, rlist) {
         if ((__be32)port == (__be32)qe->port)
             return qe;
     }
@@ -343,7 +347,7 @@ static struct mc_fdb_group *mc_fdb_group_find(struct hlist_head *head,
     struct hlist_node *h;
     struct mc_fdb_group *fg;
 
-    hlist_for_each_entry_rcu(fg, h, head, fslist) {
+    os_hlist_for_each_entry_rcu(fg, h, head, fslist) {
         if (!compare_ether_addr(mac, fg->mac))
             return fg;
     }
@@ -397,7 +401,7 @@ static struct mc_port_group *mc_port_group_find(struct hlist_head *head,
     struct hlist_node *h;
     struct mc_port_group *pg;
 
-    hlist_for_each_entry_rcu(pg, h, head, pslist) {
+    os_hlist_for_each_entry_rcu(pg, h, head, pslist) {
         if ((__be32)port == (__be32)pg->port)
             return pg;
     }
@@ -417,7 +421,7 @@ static void mc_port_group_destroy(struct mc_port_group *pg)
     struct hlist_node *h;
     struct mc_fdb_group *fg;
 
-    hlist_for_each_entry_rcu(fg, h, &pg->fslist, fslist) {
+    os_hlist_for_each_entry_rcu(fg, h, &pg->fslist, fslist) {
         mc_fdb_group_destroy(fg);
     }
 
@@ -447,7 +451,7 @@ struct mc_mdb_entry *mc_mdb_find(struct hlist_head *head,
     struct hlist_node *h;
     struct mc_mdb_entry *mdb;
 
-    hlist_for_each_entry_rcu(mdb, h, head, hlist) {
+    os_hlist_for_each_entry_rcu(mdb, h, head, hlist) {
         if (!memcmp(group, &mdb->group, sizeof(struct mc_ip)))
             return mdb;
     }
@@ -467,7 +471,8 @@ static void mc_mdb_destroy(struct mc_mdb_entry *mdb)
     struct hlist_node *h;
     struct mc_port_group *pg;
 
-    hlist_for_each_entry_rcu(pg, h, &mdb->pslist, pslist) {
+    os_hlist_for_each_entry_rcu(pg, h, &mdb->pslist, pslist) {
+
         mc_port_group_destroy(pg);
     }
 
@@ -533,11 +538,11 @@ static void mc_mdb_expired(unsigned long data)
     struct hlist_node *pgh;
 
     spin_lock_bh(&mc->lock);
-    hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
+    os_hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
         struct mc_fdb_group *fg;
         struct hlist_node *fgh;
 
-        hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
+        os_hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
             if (time_before(fg->ageing_timer, mdb->timer_base))
                 mc_fdb_group_destroy(fg);
         }
@@ -612,7 +617,7 @@ static struct mc_fdb_group *mc_update_hybrid_fdb_group(struct hlist_head *pslist
             
     if (hlist_empty(pslist)) return NULL;
 
-    hlist_for_each_entry_rcu(pg, pgh, pslist, pslist) {
+    os_hlist_for_each_entry_rcu(pg, pgh, pslist, pslist) {
         struct mc_fdb_group *fg;
         struct hlist_node *fgh;
         
@@ -623,7 +628,7 @@ static struct mc_fdb_group *mc_update_hybrid_fdb_group(struct hlist_head *pslist
 	 * being changed between different ports. If the fdb already be snoopped, do not create
 	 * a new fg, otherwise the source list will be cleared.
 	 */
-        hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
+        os_hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
             if (!compare_ether_addr(mac, fg->mac)) {
                 pg->ageing_timer = now;
                 fg->ageing_timer = now;
@@ -1158,12 +1163,12 @@ static int mc_ipv4_source_list_filter(struct mc_mdb_entry *mdb,
         }
 
         loop_done = 0;
-        hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
+        os_hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
             struct mc_fdb_group *fg;
             struct hlist_node *fgh;
 
             if (hlist_empty(&pg->fslist)) continue;
-            hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
+            os_hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
                 if (mc_ipv4_filter_source(fg, srcs[m])) {
                     if (m < grec_nsrcs - 1)
                         memcpy(&srcs[m], &srcs[m+1], sizeof (__be32) * (grec_nsrcs - 1 - m));
@@ -1481,12 +1486,12 @@ static int mc_ipv6_source_list_filter(struct mc_mdb_entry *mdb,
         }
 
         loop_done = 0;
-        hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
+        os_hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
             struct mc_fdb_group *fg;
             struct hlist_node *fgh;
 
             if (hlist_empty(&pg->fslist)) continue;
-            hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
+            os_hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
                 if (mc_ipv6_filter_source(fg, &srcs[m])) {
                     if (m < grec_nsrcs - 1)
                         memcpy(&srcs[m], &srcs[m+1], sizeof(struct in6_addr) * (grec_nsrcs - 1 - m));
@@ -1762,7 +1767,7 @@ static void mc_query_cycle_start(struct mc_struct *mc,
             goto out;
         for (i = 0; i < MC_HASH_SIZE; i++) {
             struct hlist_node *h;
-            hlist_for_each_entry_rcu(mdb, h, &mc->hash[i], hlist) {
+            os_hlist_for_each_entry_rcu(mdb, h, &mc->hash[i], hlist) {
                 if (mdb->group.pro != htons(pro))
                     continue;
                 if (timer_pending(&mdb->etimer) ?
@@ -2238,21 +2243,21 @@ void mc_fdb_change(__u8 *mac, int event)
             struct mc_mdb_entry *mdb;
             struct hlist_node *mdbh;
 
-            hlist_for_each_entry_rcu(mdb, mdbh, &mc->hash[i], hlist) {
+            os_hlist_for_each_entry_rcu(mdb, mdbh, &mc->hash[i], hlist) {
                 struct mc_port_group *pg;
                 struct hlist_node *pgh;
 
                 if (hlist_empty(&mdb->pslist))
                     continue;
 
-                hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
+                os_hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
                     struct mc_fdb_group *fg;
                     struct hlist_node *fgh;
 
                     if (hlist_empty(&pg->fslist))
                         continue;
 
-                    hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
+                    os_hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
 			if (!compare_ether_addr(mac, fg->mac))
 			    fg->fdb_age_out = 1;
                     }
@@ -2297,7 +2302,7 @@ void mc_nbp_change(struct net_bridge_port *p, int event)
 
     spin_lock_bh(&mc->lock);
         
-    hlist_for_each_entry_rcu(qe, h, &mc->rp.igmp_rlist, rlist) {
+    os_hlist_for_each_entry_rcu(qe, h, &mc->rp.igmp_rlist, rlist) {
         if (qe->port == p) {
             mc_querier_entry_destroy(qe);
             delay_reset = 1;
@@ -2307,7 +2312,7 @@ void mc_nbp_change(struct net_bridge_port *p, int event)
         mc_ipv4_rp_reset(mc, &mc->rp);
 
 #ifdef HYBRID_MC_MLD
-    hlist_for_each_entry_rcu(qe, h, &mc->rp.mld_rlist, rlist) {
+    os_hlist_for_each_entry_rcu(qe, h, &mc->rp.mld_rlist, rlist) {
         if (qe->port == p) {
             mc_querier_entry_destroy(qe);
             delay_reset = 1;
@@ -2321,14 +2326,14 @@ void mc_nbp_change(struct net_bridge_port *p, int event)
         struct mc_mdb_entry *mdb;
         struct hlist_node *mdbh;
 
-        hlist_for_each_entry_rcu(mdb, mdbh, &mc->hash[i], hlist) {
+        os_hlist_for_each_entry_rcu(mdb, mdbh, &mc->hash[i], hlist) {
             struct mc_port_group *pg;
             struct hlist_node *pgh;
 
             if (hlist_empty(&mdb->pslist))
                 continue;
 
-            hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
+            os_hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
                	if (hlist_empty(&pg->fslist))
                     continue;
                	mc_port_group_destroy(pg);
@@ -2373,12 +2378,12 @@ static void mc_rlist_flush(struct mc_struct *mc)
     struct hlist_node *h, *n;
     struct mc_querier_entry *qe;
 
-    hlist_for_each_entry_safe(qe, h, n, &mc->rp.igmp_rlist, rlist) {
+    os_hlist_for_each_entry_safe(qe, h, n, &mc->rp.igmp_rlist, rlist) {
         mc_querier_entry_destroy(qe);
     }
     mc_ipv4_rp_reset(mc, &mc->rp);
 #ifdef HYBRID_MC_MLD
-    hlist_for_each_entry_safe(qe, h, n, &mc->rp.mld_rlist, rlist) {
+    os_hlist_for_each_entry_safe(qe, h, n, &mc->rp.mld_rlist, rlist) {
         mc_querier_entry_destroy(qe);
     }
     mc_ipv6_rp_reset(mc, &mc->rp);
@@ -2394,7 +2399,7 @@ static void mc_mdb_flush(struct mc_struct *mc)
     for (i = 0; i < MC_HASH_SIZE; i++) {
         struct mc_mdb_entry *mdb;
         struct hlist_node *h, *n;
-        hlist_for_each_entry_safe(mdb, h, n, &mc->hash[i], hlist) {
+        os_hlist_for_each_entry_safe(mdb, h, n, &mc->hash[i], hlist) {
             mc_mdb_destroy(mdb);
         }
     }
@@ -2474,7 +2479,7 @@ static void mc_router_cleanup(unsigned long data)
     struct mc_router_port *rp = &mc->rp;
 
     spin_lock_bh(&mc->lock);
-    hlist_for_each_entry_rcu(qe, h, &rp->igmp_rlist, rlist) {
+    os_hlist_for_each_entry_rcu(qe, h, &rp->igmp_rlist, rlist) {
         unsigned long this_timer = qe->ageing_timer + qe->qqic * qe->qrv + qe->max_resp_time / 2;
 
         if (time_before_eq(this_timer, jiffies)) {
@@ -2489,7 +2494,7 @@ static void mc_router_cleanup(unsigned long data)
 
 #ifdef HYBRID_MC_MLD
     delay_reset = 0;
-    hlist_for_each_entry_rcu(qe, h, &rp->mld_rlist, rlist) {
+    os_hlist_for_each_entry_rcu(qe, h, &rp->mld_rlist, rlist) {
         unsigned long this_timer = qe->ageing_timer + qe->qqic * qe->qrv + qe->max_resp_time / 2;
 
         if (time_before_eq(this_timer, jiffies)) {
@@ -2521,7 +2526,7 @@ static void mc_mdb_query(unsigned long data)
         struct mc_mdb_entry *mdb;
         struct hlist_node *mdbh;
 
-        hlist_for_each_entry_rcu(mdb, mdbh, &mc->hash[i], hlist) {
+        os_hlist_for_each_entry_rcu(mdb, mdbh, &mc->hash[i], hlist) {
             struct mc_port_group *pg;
             struct hlist_node *pgh;
 
@@ -2534,14 +2539,14 @@ static void mc_mdb_query(unsigned long data)
             else if (mdb->group.pro == htons(ETH_P_IPV6) && mc->rp.mld_root_qe)
                 continue;
 #endif
-            hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
+            os_hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
                 struct mc_fdb_group *fg;
                 struct hlist_node *fgh;
 
                 if (hlist_empty(&pg->fslist))
                     continue;
 
-                hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
+                os_hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
                     mc_send_query(mc, pg->port, &mdb->group, mc_fdb_mac_get(fg), fg->filter_mode);
                 }
             }
@@ -2585,7 +2590,7 @@ static void mc_mdb_cleanup(unsigned long data)
         struct mc_mdb_entry *mdb;
         struct hlist_node *mdbh;
 
-        hlist_for_each_entry_rcu(mdb, mdbh, &mc->hash[i], hlist) {
+        os_hlist_for_each_entry_rcu(mdb, mdbh, &mc->hash[i], hlist) {
             struct mc_port_group *pg;
             struct hlist_node *pgh;
             struct net_bridge_port *port;
@@ -2603,7 +2608,7 @@ static void mc_mdb_cleanup(unsigned long data)
                 expire_time = mld_expire_time;
 #endif
 
-            hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
+            os_hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
                 struct mc_fdb_group *fg;
                 struct hlist_node *fgh;
 
@@ -2616,7 +2621,7 @@ static void mc_mdb_cleanup(unsigned long data)
                     continue;
                 }
 
-                hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
+                os_hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
                     unsigned long this_timer = fg->ageing_timer + expire_time;
                     if (time_before_eq(this_timer, now))
                         mc_fdb_group_destroy(fg);

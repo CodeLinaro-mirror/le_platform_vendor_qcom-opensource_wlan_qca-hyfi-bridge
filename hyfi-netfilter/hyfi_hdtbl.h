@@ -66,7 +66,7 @@ static inline struct net_hdtbl_entry* __hyfi_hdtbl_get(
 	struct hlist_node *h;
 	struct net_hdtbl_entry *hd;
 
-	hlist_for_each_entry_rcu(hd, h, &br->hash_hd[hdtbl_mac_hash(addr)], hlist) {
+	os_hlist_for_each_entry_rcu(hd, h, &br->hash_hd[hdtbl_mac_hash(addr)], hlist) {
 		if (!compare_ether_addr(hd->addr.addr, addr)) {
 			return hd;
 		}

@@ -28,7 +28,23 @@
 #include "mc_netfilter.h"
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
+unsigned int hyfi_netfilter_forwarding_hook( const struct nf_hook_ops *ops, struct sk_buff *skb,
+        const struct net_device *in, const struct net_device *out,
+        int (*okfn)(struct sk_buff *) );
 
+unsigned int hyfi_netfilter_local_out_hook( const struct nf_hook_ops *ops,
+        struct sk_buff *skb, const struct net_device *in,
+        const struct net_device *out, int (*okfn)(struct sk_buff *));
+
+unsigned int hyfi_netfilter_local_in_hook( const struct nf_hook_ops *ops, struct sk_buff *skb,
+        const struct net_device *in, const struct net_device *out,
+        int (*okfn)(struct sk_buff *) );
+
+unsigned int hyfi_netfilter_pre_routing_hook( const struct nf_hook_ops *ops, struct sk_buff *skb,
+        const struct net_device *in, const struct net_device *out,
+        int (*okfn)(struct sk_buff *) );
+#else
 unsigned int hyfi_netfilter_forwarding_hook( unsigned int hooknum, struct sk_buff *skb,
         const struct net_device *in, const struct net_device *out,
         int (*okfn)(struct sk_buff *) );
@@ -44,6 +60,7 @@ unsigned int hyfi_netfilter_local_in_hook( unsigned int hooknum, struct sk_buff 
 unsigned int hyfi_netfilter_pre_routing_hook( unsigned int hooknum, struct sk_buff *skb,
         const struct net_device *in, const struct net_device *out,
         int (*okfn)(struct sk_buff *) );
+#endif
 
 struct nf_hook_ops hyfi_hook_ops[] __read_mostly =
 {
@@ -78,10 +95,15 @@ struct nf_hook_ops hyfi_hook_ops[] __read_mostly =
 };
 
 #define IEEE1905_MULTICAST_ADDR     "\x01\x80\xC2\x00\x00\x13" /* IEEE 1905.1 Multicast address */
-
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
+unsigned int hyfi_netfilter_forwarding_hook(const struct nf_hook_ops *ops,
+		struct sk_buff *skb, const struct net_device *in,
+		const struct net_device *out, int (*okfn)(struct sk_buff *))
+#else
 unsigned int hyfi_netfilter_forwarding_hook(unsigned int hooknum,
 		struct sk_buff *skb, const struct net_device *in,
 		const struct net_device *out, int (*okfn)(struct sk_buff *))
+#endif
 {
 	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(out);
 	struct net_bridge_port *br_port = hyfi_br_port_get(out);
@@ -112,7 +134,7 @@ unsigned int hyfi_netfilter_forwarding_hook(unsigned int hooknum,
 				return NF_DROP;
 			}
 		} else {
-			if (!__br_fdb_get(br_port->br, eth_hdr(skb)->h_dest)) {
+			if (!os_br_fdb_get(br_port->br, eth_hdr(skb)->h_dest)) {
 				if (!hyfi_bridge_should_flood(hyfi_dst_p, skb)) {
 					return NF_DROP;
 				}
@@ -121,15 +143,25 @@ unsigned int hyfi_netfilter_forwarding_hook(unsigned int hooknum,
 	}
 
 #ifndef HYFI_MC_STANDALONE_NF
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
+	return mc_forward_hook(ops, skb, in, out, okfn);
+#else
 	return mc_forward_hook(hooknum, skb, in, out, okfn);
+#endif
 #else
 	return NF_ACCEPT;
 #endif
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
+unsigned int hyfi_netfilter_local_out_hook(const struct nf_hook_ops *ops,
+        struct sk_buff *skb, const struct net_device *in,
+        const struct net_device *out, int (*okfn)(struct sk_buff *))
+#else
 unsigned int hyfi_netfilter_local_out_hook(unsigned int hooknum,
         struct sk_buff *skb, const struct net_device *in,
         const struct net_device *out, int (*okfn)(struct sk_buff *))
+#endif
 {
     struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(out);
     struct net_bridge_port *br_port = hyfi_br_port_get(out);
@@ -149,7 +181,7 @@ unsigned int hyfi_netfilter_local_out_hook(unsigned int hooknum,
 			return NF_DROP;
 		}
 	} else {
-		if (!__br_fdb_get(br_port->br, eth_hdr(skb)->h_dest)) {
+		if (!os_br_fdb_get(br_port->br, eth_hdr(skb)->h_dest)) {
 			if (!hyfi_bridge_should_flood(hyfi_p, skb)) {
 				return NF_DROP;
 			}
@@ -159,9 +191,15 @@ unsigned int hyfi_netfilter_local_out_hook(unsigned int hooknum,
 	return NF_ACCEPT;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
+unsigned int hyfi_netfilter_local_in_hook(const struct nf_hook_ops *ops,
+		struct sk_buff *skb, const struct net_device *in,
+		const struct net_device *out, int (*okfn)(struct sk_buff *))
+#else
 unsigned int hyfi_netfilter_local_in_hook(unsigned int hooknum,
 		struct sk_buff *skb, const struct net_device *in,
 		const struct net_device *out, int (*okfn)(struct sk_buff *))
+#endif
 {
     struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(in);
 
@@ -188,9 +226,15 @@ unsigned int hyfi_netfilter_local_in_hook(unsigned int hooknum,
 	return NF_ACCEPT;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
+unsigned int hyfi_netfilter_pre_routing_hook(const struct nf_hook_ops *ops,
+		struct sk_buff *skb, const struct net_device *in,
+		const struct net_device *out, int (*okfn)(struct sk_buff *))
+#else
 unsigned int hyfi_netfilter_pre_routing_hook(unsigned int hooknum,
 		struct sk_buff *skb, const struct net_device *in,
 		const struct net_device *out, int (*okfn)(struct sk_buff *))
+#endif
 {
 	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(in);
 	struct net_bridge_port *br_port = hyfi_br_port_get(in);
@@ -229,7 +273,7 @@ unsigned int hyfi_netfilter_pre_routing_hook(unsigned int hooknum,
 		}
 	}
 
-	if ((dst = __br_fdb_get(br_port->br, eth_hdr(skb)->h_source))) {
+	if ((dst = os_br_fdb_get(br_port->br, eth_hdr(skb)->h_source))) {
 		if (!hyfi_fdb_should_update(hyfi_br, br_port, dst->dst)) {
 			/* Drop packet, do not update fdb */
 			return NF_DROP;
@@ -238,7 +282,11 @@ unsigned int hyfi_netfilter_pre_routing_hook(unsigned int hooknum,
 
 	out:
 #ifndef HYFI_MC_STANDALONE_NF
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
+	return mc_pre_routing_hook(ops, skb, in, out, okfn);
+#else
 	return mc_pre_routing_hook(hooknum, skb, in, out, okfn);
+#endif
 #else
 	return NF_ACCEPT;
 #endif

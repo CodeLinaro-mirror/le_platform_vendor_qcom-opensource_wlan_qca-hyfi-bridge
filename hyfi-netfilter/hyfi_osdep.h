@@ -24,7 +24,11 @@ static inline int hyfi_br_pass_frame_up(struct sk_buff *skb)
 {
         struct net_device *indev, *brdev = BR_INPUT_SKB_CB(skb)->brdev;
         struct net_bridge *br = netdev_priv(brdev);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
+        struct pcpu_sw_netstats *brstats = this_cpu_ptr(br->stats);
+#else
         struct br_cpu_netstats *brstats = this_cpu_ptr(br->stats);
+#endif
 
         u64_stats_update_begin(&brstats->syncp);
         brstats->rx_packets++;
@@ -174,6 +178,41 @@ static inline int hyfi_ipv6_skip_exthdr(const struct sk_buff *skb, int start,
 {
 	return ipv6_skip_exthdr(skb, start, nexthdrp);
 }
+#endif
+
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 9, 0))
+#define os_hlist_for_each_entry_rcu(tpos, pos, head, member) \
+	(void)pos; \
+	hlist_for_each_entry_rcu(tpos, head, member)
+
+#define os_hlist_for_each_entry_safe(tpos, pos, n, head, member) \
+	(void)pos; \
+	hlist_for_each_entry_safe(tpos, n, head, member)
+
+#define os_hlist_for_each_entry(tpos, pos, head, member) \
+	(void)pos; \
+	hlist_for_each_entry(tpos, head, member)
+
+#define os_br_fdb_get(a,b) __br_fdb_get(a,b,0)
+#else
+
+#define os_hlist_for_each_entry_rcu(tpos, pos, head, member) \
+	hlist_for_each_entry_rcu(tpos, pos, head, member)
+
+#define os_hlist_for_each_entry_safe(tpos, pos, n, head, member) \
+	(void)pos; \
+	hlist_for_each_entry_safe(tpos, pos, n, head, member)
+
+#define os_hlist_for_each_entry(tpos, pos, head, member) \
+	hlist_for_each_entry(tpos, pos, head, member)
+
+#define os_br_fdb_get(a,b) __br_fdb_get(a,b)
+#endif
+
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
+#define compare_ether_addr(a,b)      !ether_addr_equal(a,b)
 #endif
 
 #endif

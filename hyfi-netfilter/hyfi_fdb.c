@@ -58,7 +58,7 @@ int hyfi_fdb_fillbuf(struct net_bridge *br, void *buf, u_int32_t buf_len,
 
 	rcu_read_lock();
 	for (i = 0; i < BR_HASH_SIZE; i++) {
-		hlist_for_each_entry_rcu(f, h, &br->hash[i], hlist)	{
+		os_hlist_for_each_entry_rcu(f, h, &br->hash[i], hlist)	{
 			if (has_expired(br, f))
 				continue;
 

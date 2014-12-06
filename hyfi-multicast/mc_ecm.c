@@ -40,7 +40,7 @@ static int hyfi_bridge_if_source_filter(struct mc_mdb_entry *mdb, uint32_t ifind
     if (hlist_empty(&mdb->pslist))
         return 1;
 
-    hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
+    os_hlist_for_each_entry_rcu(pg, pgh, &mdb->pslist, pslist) {
         struct mc_fdb_group *fg;
         struct hlist_node *fgh;
 
@@ -52,7 +52,7 @@ static int hyfi_bridge_if_source_filter(struct mc_mdb_entry *mdb, uint32_t ifind
             return 1;
 
         /*anyone who would like to receive stream from the source*/
-        hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
+        os_hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
             if (!fg->filter_mode || (fg->filter_mode == HYFI_MC_EXCLUDE && !fg->a.nsrcs))
                 return 0;
 
