@@ -110,6 +110,7 @@ void hyfi_br_notify(int group, int event, const void *ptr)
             }
 
             case RTM_DELLINK: {
+                hyfi_hdtbl_delete_by_port(hyfi_br, p);
                 hyfi_hatbl_delete_by_port(hyfi_br, p);
                 hyfi_bridge_delete_port(p);
 
