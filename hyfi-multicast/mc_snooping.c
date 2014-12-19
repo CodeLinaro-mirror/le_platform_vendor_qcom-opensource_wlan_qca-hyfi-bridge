@@ -2780,7 +2780,7 @@ int mc_attach(struct hyfi_net_bridge *hyfi_br)
     mc->dscp = MC_DEFAULT_DSCP;
     mc->convert_all = 1; /* Convert all as default  */
     mc->timeout_gsq_enable = 1; /* enable timeout from group sepcific query */
-    mc->timeout_asq_enable = 1; /* enable timeout from all system query */
+    mc->timeout_asq_enable = 0; /* disable timeout from all system query */
     mc->timeout_gmi_enable = 1; /* enable timeout from membership interval */
     mc->m2i3_filter_enable = 1; /* enable mldv2/igmpv3 leave filter */
     mc->ignore_tbit = 0; /* Allow IPv6 Multicast Groups, that don’t have the T-Bit enabled, to be snooped */
