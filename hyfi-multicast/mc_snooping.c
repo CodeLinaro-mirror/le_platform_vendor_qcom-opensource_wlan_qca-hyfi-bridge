@@ -2464,12 +2464,14 @@ int mc_stop(struct mc_struct *mc)
     spin_lock_bh(&mc->lock);
     mc->started = 0;
 
+    mc_mdb_flush(mc);
+    mc_rlist_flush(mc);
+
     del_timer_sync(&mc->qtimer);
     del_timer_sync(&mc->atimer);
     del_timer_sync(&mc->rtimer);
     del_timer_sync(&mc->evtimer);
-    mc_mdb_flush(mc);
-    mc_rlist_flush(mc);
+
     spin_unlock_bh(&mc->lock);
 
     return 0;
