@@ -917,11 +917,17 @@ static void mc_leave_group(struct mc_struct *mc,
                      struct mc_ip *group, struct sk_buff *skb)
 {
     struct mc_fdb_group *fg;
+    struct mc_mdb_entry *mdb;
 
     fg = mc_fdb_group_get(mc, group, skb);
     if (fg) {
         spin_lock_bh(&mc->lock);
+        mdb = fg->pg->mdb;
         mc_fdb_group_destroy(fg);
+
+        if (!atomic_read(&mdb->users))
+            mc_mdb_destroy(mdb);
+
         spin_unlock_bh(&mc->lock);
     }
 }
