@@ -115,6 +115,12 @@ HYFI_MC_STATIC unsigned int mc_forward_hook(unsigned int hooknum, struct sk_buff
     struct net_bridge_port *port;
     struct mc_mdb_entry *mdb = MC_SKB_CB(skb)->mdb;
 
+    /* Checks are relevant for multicast packets only */
+    if ((likely(!is_multicast_ether_addr(eth_hdr(skb)->h_dest))) ||
+        (unlikely(is_broadcast_ether_addr(eth_hdr(skb)->h_dest)))) {
+        goto accept;
+    }
+
     /* Leave filter */
     if (mdb && MC_SKB_CB(skb)->type == MC_LEAVE && 
             (atomic_read(&mdb->users) > 0))
