@@ -207,23 +207,29 @@ static inline int hyfi_hash_skbuf(struct sk_buff *skb, u_int32_t *hash,
 #ifdef CONFIG_INET
 		/* IP Address */
 		if (likely(ip)) {
-			p = hash32_buf(ip->daddr, ip->saddr, p);
-
 			/* Protocol */
 			p = hash32_buf(ip->protocol, 0, p);
 
+			/* To reduce the chance of collisions with correlated port
+			 * numbers, mix the destination IP and port together first
+			 * and then the source IP and port.
+			 */
 #ifdef HYBRID_HASH_TCPUDP_PORT
 			/* UDP port */
-			if (udp) {
-				if (!(ip->frag_off & htons(IP_MF | IP_OFFSET))) {
-					p = hash32_buf(udp->dest, udp->source, p);
-				}
+			if (udp && !(ip->frag_off & htons(IP_MF | IP_OFFSET))) {
+				p = hash32_buf(ip->daddr, udp->dest, p);
+				p = hash32_buf(ip->saddr, udp->source, p);
 			}
 			/* TCP port */
-			else if (tcp) {
-				if (!(ip->frag_off & htons(IP_MF | IP_OFFSET))) {
-					p = hash32_buf(tcp->dest, tcp->source, p);
-				}
+			else if (tcp && !(ip->frag_off & htons(IP_MF | IP_OFFSET))) {
+				p = hash32_buf(ip->daddr, tcp->dest, p);
+				p = hash32_buf(ip->saddr, tcp->source, p);
+			}
+			/* Not TCP nor UDP or is a fragment */
+			else {
+#endif
+				p = hash32_buf(ip->daddr, ip->saddr, p);
+#ifdef HYBRID_HASH_TCPUDP_PORT
 			}
 #endif
 		}
