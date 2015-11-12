@@ -24,7 +24,11 @@
 
 struct hyfi_ecm_flow_data_t {
 	u_int32_t ecm_serial;
+        /* Since NSS connections are bidirectional, but HyFi hash entries
+           are unidirectional, need to store both the forward and reverse
+           direction hashes with the flow data. */
 	u_int32_t hash;
+        u_int32_t reverse_hash;
 	u_int32_t flag;
 	u_int32_t priority;
 	u_int16_t seq;
@@ -40,6 +44,7 @@ struct hyfi_ecm_flow_data_t {
  * 1: not interested
  * 2: hy-fi not attached
  */
-int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int64_t num_bytes, u_int64_t num_packets);
+int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int32_t hash, 
+	u_int8_t *da, u_int8_t *sa, u_int64_t num_bytes, u_int64_t num_packets);
 
 #endif /* HYFI_ECM_H_ */

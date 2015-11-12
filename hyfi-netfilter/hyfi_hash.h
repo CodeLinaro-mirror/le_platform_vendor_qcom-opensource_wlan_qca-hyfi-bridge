@@ -82,6 +82,28 @@ static inline void hyfi_set_dscp_priority(u_int32_t* priority, u_int32_t tos)
 	*priority |= (tos << 1) & HYFI_HACTIVE_TBL_PRIORITY_DSCP_MASK;
 }
 
+/**
+ * @brief Calculate the hash from a skb 
+ *  
+ * @note This function and the one below it 
+ *       (hyfi_hash_skbuf_reverse) must be kept in sync.  Both
+ *       must use the same hash function to calculate the hash,
+ *       so if one is changed, the other must be too.  The
+ *       reverse function was added for NSS to be able to get
+ *       the hash for flows in both the forward and reverse
+ *       direction from a single skb.  This function was not
+ *       modified to calculate both forward and reverse hashes
+ *       because it is used in the data path for unaccelerated
+ *       flows, and performance is critical.
+ * 
+ * @param [in] skb  skb to calculate the hash from
+ * @param [out] hash  calculated hash
+ * @param [out] flag  flags describing the packet
+ * @param [out] priority  priority of the packet
+ * @param [out] seq  sequence
+ * 
+ * @return 0 on success, negative value on error
+ */
 static inline int hyfi_hash_skbuf(struct sk_buff *skb, u_int32_t *hash,
 		u_int32_t *flag, u_int32_t *priority, u_int16_t *seq)
 {
@@ -242,6 +264,155 @@ static inline int hyfi_hash_skbuf(struct sk_buff *skb, u_int32_t *hash,
 		if (ip6) {
 			u_int32_t key1 = ip6->saddr.s6_addr32[2] ^ ip6->saddr.s6_addr32[3];
 			u_int32_t key2 = ip6->daddr.s6_addr32[2] ^ ip6->daddr.s6_addr32[3];
+			p = hash32_buf(key1, key2, p);
+			/* IPv6 flow label */
+			flow = *(u_int32_t*)ip6;
+			p = hash32_buf(flow, 0, p);
+		}
+#endif
+
+		p ^= (p >> 16);
+		p ^= (p >> 8);
+		*hash = p & 0xff;
+	} while (0);
+
+	return (retval);
+}
+
+/**
+ * @brief Calculate the hash for a skb as if the packet was 
+ *        received in the reverse direction (ie. all addresses
+ *        and ports are reversed)
+ *  
+ * @see hyfi_hash_skbuf 
+ * 
+ * @param [in] skb  skb to calculate the hash from
+ * @param [out] hash  calculated hash (from reversed version of 
+ *                    skb)
+ *  
+ * @return 0 on success, negative value on error
+ */
+static inline int hyfi_hash_skbuf_reverse(struct sk_buff *skb, u_int32_t *hash)
+{
+	u_int16_t etype = 0, vlan_tag = 0;
+	u_int32_t p = 0;
+	int retval = 0;
+	struct ethhdr *eh;
+#ifdef CONFIG_INET
+	const struct iphdr *ip = NULL;
+	struct udphdr *udp = NULL;
+	struct tcphdr *tcp = NULL;
+#endif
+#ifdef CONFIG_IPV6
+	struct ipv6hdr *ip6 = NULL;
+	u_int32_t flow;
+#endif
+
+	do {
+		if (unlikely(skb->len <= 0 || !skb_mac_header_was_set(skb))) {
+			retval = -EIO;
+			break;
+		}
+
+		eh = eth_hdr(skb);
+		etype = ntohs(eh->h_proto);
+
+		/* Special handling for encapsulating VLAN frames */
+		if (skb->protocol == htons(ETH_P_8021Q)) {
+			skb_push(skb, ETH_HLEN);
+			if (vlan_get_tag(skb, &vlan_tag) < 0) {
+				skb_pull(skb, ETH_HLEN);
+				retval = -EFAULT;
+				break;
+			}
+			skb_pull(skb, ETH_HLEN);
+
+			etype = vlan_eth_hdr(skb)->h_vlan_encapsulated_proto;
+		}
+
+		switch (etype) {
+#ifdef CONFIG_INET
+		case ETH_P_IP:
+			ip = ip_hdr(skb);
+			if (ip == NULL ) {
+				retval = -EFAULT;
+				break;
+			}
+#ifdef HYBRID_HASH_TCPUDP_PORT
+			if (ip->protocol == IPPROTO_UDP) {
+				udp = (struct udphdr *) (skb_network_header(skb)
+						+ ip_hdrlen(skb));
+			} else if (ip->protocol == IPPROTO_TCP) {
+				tcp = (struct tcphdr *) (skb_network_header(skb)
+						+ ip_hdrlen(skb));
+			}
+#endif
+			break;
+#endif
+#ifdef CONFIG_IPV6
+		case ETH_P_IPV6:
+			ip6 = ipv6_hdr(skb);
+			if (ip6 == NULL) {
+				retval = -EFAULT;
+				break;
+			}
+			break;
+#endif
+		default:
+			break;
+		}
+		if (retval != 0)
+			break;
+
+		/* Ethernet address */
+		{
+			u_int32_t key1 = get_unaligned( (u_int32_t *) ( &eh->h_source[2] ) );
+			u_int32_t key2 = get_unaligned( (u_int32_t *) ( &eh->h_dest[2] ) );
+			p = hash32_buf(key1, key2, 0);
+		}
+
+		/* VLAN tag */
+		if (vlan_tag)
+			p = hash32_buf(vlan_tag, 0, p);
+
+#ifdef CONFIG_INET
+		/* IP Address */
+		if (likely(ip)) {
+			/* Protocol */
+			p = hash32_buf(ip->protocol, 0, p);
+
+			/* To reduce the chance of collisions with correlated port
+			 * numbers, mix the source IP and port together first
+			 * and then the destination IP and port.
+			 */
+#ifdef HYBRID_HASH_TCPUDP_PORT
+			/* UDP port */
+			if (udp && !(ip->frag_off & htons(IP_MF | IP_OFFSET))) {
+				p = hash32_buf(ip->saddr, udp->source, p);
+				p = hash32_buf(ip->daddr, udp->dest, p);
+			}
+			/* TCP port */
+			else if (tcp && !(ip->frag_off & htons(IP_MF | IP_OFFSET))) {
+				p = hash32_buf(ip->saddr, tcp->source, p);
+				p = hash32_buf(ip->daddr, tcp->dest, p);
+			}
+			/* Not TCP nor UDP or is a fragment */
+			else {
+#endif
+				p = hash32_buf(ip->saddr, ip->daddr, p);
+#ifdef HYBRID_HASH_TCPUDP_PORT
+			}
+#endif
+		}
+#endif /* CONFIG_INET */
+
+#ifdef CONFIG_IPV6
+		/* Todo: If there are extension headers in the packet, we would have to process those first.
+		 * The last extension header's NH field will indicate the transport layer protocol.
+		 */
+		if (ip6) {
+			u_int32_t key1 = ip6->daddr.s6_addr32[2] ^ ip6->daddr.s6_addr32[3];
+			u_int32_t key2 = ip6->saddr.s6_addr32[2] ^ ip6->saddr.s6_addr32[3];
 			p = hash32_buf(key1, key2, p);
 			/* IPv6 flow label */
 			flow = *(u_int32_t*)ip6;

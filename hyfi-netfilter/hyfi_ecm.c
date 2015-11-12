@@ -34,7 +34,9 @@
  * 2: hy-fi not attached
  */
 
-static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br, const struct hyfi_ecm_flow_data_t *flow)
+static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br, 
+	const struct hyfi_ecm_flow_data_t *flow, u_int32_t hash,
+	u_int8_t *da, u_int8_t *sa, u_int64_t num_bytes, u_int64_t num_packets)
 {
 	u_int32_t traffic_class;
 	struct net_hatbl_entry *ha = NULL;
@@ -45,16 +47,17 @@ static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br, const struct
 	spin_lock_bh(&hyfi_br->hash_ha_lock);
 
 	/* Find H-Active entry */
-	ha = hatbl_find(hyfi_br, flow->hash, flow->da,
-				traffic_class, flow->priority);
+	ha = hatbl_find(hyfi_br, hash, da, traffic_class, flow->priority);
 
 	if (ha) {
 		/* Found. Update ecm serial number and return */
 		ha->ecm_serial = flow->ecm_serial;
+		ha->prev_num_bytes = num_bytes;
+		ha->prev_num_packets = num_packets;
 		spin_unlock_bh(&hyfi_br->hash_ha_lock);
 #if 0
 		printk("hyfi: New accelerated connection with serial number: %d, hash: 0x%02x\n",
-				flow->ecm_serial, flow->hash);
+				flow->ecm_serial, hash);
 #endif
 		return 0;
 
@@ -68,32 +71,39 @@ static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br, const struct
 		spin_unlock_bh(&hyfi_br->hash_ha_lock);
 
 		spin_lock_bh(&hyfi_br->hash_hd_lock);
-		hd = hyfi_hdtbl_find(hyfi_br, flow->da);
+		hd = hyfi_hdtbl_find(hyfi_br, da);
 
 		if (hd) {
 			/* Create a new entry based on H-Default table. The function
 			 * will keep the ha-lock if created successfully. */
-			ha = hyfi_hatbl_insert_ecm_classifier(hyfi_br, flow->hash,
+			ha = hyfi_hatbl_insert_ecm_classifier(hyfi_br, hash,
 					traffic_class, hd, flow->priority,
-					flow->sa, flow->ecm_serial);
+					sa, flow->ecm_serial);
 
 			/* Release the hd-lock, we are done with the hd entry */
 			spin_unlock_bh(&hyfi_br->hash_hd_lock);
 
 			if(ha) {
 				/* H-Active created. */
+				ha->prev_num_bytes = num_bytes;
+				ha->prev_num_packets = num_packets;
 				spin_unlock_bh(&hyfi_br->hash_ha_lock);
-#if 0
+#if 0	
 				printk("hyfi: New accelerated connection from HD with serial number: %d, hash: 0x%02x",
-						flow->ecm_serial, flow->hash);
+						flow->ecm_serial, hash);
 #endif
 				return 0;
+			} else {
+				printk("hyfi: Failed to create new accelerated connection to %02X:%02X:%02X:%02X:%02X:%02X from HD with serial number: %d, hash: 0x%02x",
+					da[0], da[1], da[2], da[3],
+					da[4], da[5], flow->ecm_serial, hash);
+				return -1;
 			}
 		} else {
 #if 0
-			printk("hyfi: no hd to %02X:%02X:%02X:%02X:%02X:%02X\n", flow->da[0],
-					flow->da[1], flow->da[2], flow->da[3],
-					flow->da[4], flow->da[5] );
+			printk("hyfi: no hd to %02X:%02X:%02X:%02X:%02X:%02X\n", da[0],
+					da[1], da[2], da[3],
+					da[4], da[5] );
 #endif
 			/* No such H-Default entry, unlock hd-lock */
 			spin_unlock_bh(&hyfi_br->hash_hd_lock);
@@ -104,7 +114,8 @@ static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br, const struct
 	return 0;
 }
 
-int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int64_t num_bytes, u_int64_t num_packets)
+int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int32_t hash,
+	u_int8_t *da, u_int8_t *sa, u_int64_t num_bytes, u_int64_t num_packets)
 {
 	struct net_hatbl_entry *ha = NULL;
 	struct hyfi_net_bridge *hyfi_br;
@@ -126,7 +137,7 @@ int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int64_t num
 	spin_lock_bh(&hyfi_br->hash_ha_lock);
 
 	/* Find H-Active entry */
-	if (flow->ecm_serial != ~0 && (ha = hatbl_find_ecm(hyfi_br, flow->hash, flow->ecm_serial))) {
+	if (flow->ecm_serial != ~0 && (ha = hatbl_find_ecm(hyfi_br, hash, flow->ecm_serial))) {
 		if (!hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_ACCL_ENTRY)) {
 
 			/* This flow is now accelerated */
@@ -149,14 +160,15 @@ int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int64_t num
 		spin_unlock_bh(&hyfi_br->hash_ha_lock);
 #if 0
 		printk("hyfi: Updated stats for hash 0x%02x, serial=%d, num_bytes=%d, num_packets=%d\n",
-				flow->hash, flow->ecm_serial, ha->num_bytes, ha->num_packets);
+				hash, flow->ecm_serial, ha->num_bytes, ha->num_packets);
 #endif
 		return 0;
 	}
 
 	spin_unlock_bh(&hyfi_br->hash_ha_lock);
 
-	ret = hyfi_ecm_new_connection(hyfi_br, flow);
+	ret = hyfi_ecm_new_connection(hyfi_br, flow, hash, da, sa,
+		num_bytes, num_packets);
 	return ret;
 }
 
