@@ -68,6 +68,12 @@ int hyfi_fdb_fillbuf(struct net_bridge *br, void *buf, u_int32_t buf_len,
 				continue;
 			}
 
+			/* Ignore any local entries that do not have a valid
+			 * port
+			 */
+			if (!f->dst)
+				continue;
+
 			if (skip) {
 				skip--;
 				continue;
