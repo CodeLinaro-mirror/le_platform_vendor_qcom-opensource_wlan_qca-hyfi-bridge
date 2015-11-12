@@ -25,6 +25,58 @@
 #include "hyfi_hatbl.h"
 #include "hyfi_ecm.h"
 
+/**
+ * @brief A H-Active entry is newly accelerated.
+ *
+ * Set flags and clear stats
+ *
+ * @param [in] num_bytes  number of bytes sent in the update
+ * @param [in] num_packets  number of packets sent in the update
+ * @param [inout] ha  H-Active table entry to update
+ * @param [inout] flow  flow entry to update
+ * @param [out] should_keep_on_fdb_update  set to true if this
+ *                                         entry should be kept
+ *                                         on FDB update, false
+ *                                         if it should be
+ *                                         deleted (static
+ *                                         entries should be
+ *                                         deleted)
+ */
+static void hyfi_ecm_mark_as_newly_accelerated(u_int64_t num_bytes, u_int64_t num_packets,
+	struct net_hatbl_entry *ha, const struct hyfi_ecm_flow_data_t *flow,
+	bool *should_keep_on_fdb_update)
+{
+#if 0
+	printk("hyfi: New accelerated connection with serial number (prev): %d (%d), hash: 0x%02x, should_keep %d\n",
+		flow->ecm_serial, ha->ecm_serial, ha->hash,
+               !hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_STATIC_ENTRY));
+#endif
+
+	hyfi_ha_set_flag(ha, HYFI_HACTIVE_TBL_ACCL_ENTRY);
+
+	/* Flush seamless buffer - does not apply for accelerated flows */
+	if (hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_SEAMLESS_ENABLED)) {
+		hyfi_ha_clear_flag(ha, HYFI_HACTIVE_TBL_SEAMLESS_ENABLED);
+		hyfi_psw_flush_track_q(&ha->psw_stm_entry);
+	}
+
+	ha->ecm_serial = flow->ecm_serial;
+	ha->prev_num_bytes = num_bytes;
+	ha->prev_num_packets = num_packets;
+
+	/* We want to keep non-static entries.
+	 * A static entry is learned from FDB, and in HyFi indicates
+	 * a legacy, directly connected device.  If we receive an FDB
+	 * update for a static entry, it indicates the place where this
+	 * device is connected has changed, and hence connections should
+	 * be deleted, and H-Active updated.  A non-static entry would include
+	 * connections like those between RE and CAP.  Since HyFi has dual
+	 * backhauls, the FDB can change very frequently, and these updates
+	 * should be ignored, since no action needs to be taken.
+	 */
+	*should_keep_on_fdb_update = !hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_STATIC_ENTRY);
+}
+
 /*
  * Notify about a new connection
  * returns:
@@ -34,14 +86,15 @@
  * 2: hy-fi not attached
  */
 
-static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br, 
+static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br,
 	const struct hyfi_ecm_flow_data_t *flow, u_int32_t hash,
-	u_int8_t *da, u_int8_t *sa, u_int64_t num_bytes, u_int64_t num_packets)
+	u_int8_t *da, u_int8_t *sa, u_int64_t num_bytes, u_int64_t num_packets,
+	bool *should_keep_on_fdb_update)
 {
 	u_int32_t traffic_class;
 	struct net_hatbl_entry *ha = NULL;
 
-	traffic_class = (flow->flag & IS_IPPROTO_UDP) ?
+	traffic_class = (flow->flag & ECM_HYFI_IS_IPPROTO_UDP) ?
 			HYFI_TRAFFIC_CLASS_UDP : HYFI_TRAFFIC_CLASS_OTHER;
 
 	spin_lock_bh(&hyfi_br->hash_ha_lock);
@@ -51,14 +104,10 @@ static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br,
 
 	if (ha) {
 		/* Found. Update ecm serial number and return */
-		ha->ecm_serial = flow->ecm_serial;
-		ha->prev_num_bytes = num_bytes;
-		ha->prev_num_packets = num_packets;
+		hyfi_ecm_mark_as_newly_accelerated(
+			num_bytes, num_packets, ha, flow, should_keep_on_fdb_update);
 		spin_unlock_bh(&hyfi_br->hash_ha_lock);
-#if 0
-		printk("hyfi: New accelerated connection with serial number: %d, hash: 0x%02x\n",
-				flow->ecm_serial, hash);
-#endif
+
 		return 0;
 
 	} else {
@@ -85,21 +134,21 @@ static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br,
 
 			if(ha) {
 				/* H-Active created. */
-				ha->prev_num_bytes = num_bytes;
-				ha->prev_num_packets = num_packets;
+				hyfi_ecm_mark_as_newly_accelerated(
+					num_bytes, num_packets, ha, flow,
+					should_keep_on_fdb_update);
 				spin_unlock_bh(&hyfi_br->hash_ha_lock);
-#if 0	
-				printk("hyfi: New accelerated connection from HD with serial number: %d, hash: 0x%02x",
-						flow->ecm_serial, hash);
-#endif
 				return 0;
 			} else {
+#if 0
 				printk("hyfi: Failed to create new accelerated connection to %02X:%02X:%02X:%02X:%02X:%02X from HD with serial number: %d, hash: 0x%02x",
 					da[0], da[1], da[2], da[3],
 					da[4], da[5], flow->ecm_serial, hash);
+#endif
 				return -1;
 			}
 		} else {
+			struct net_bridge_fdb_entry *dst;
 #if 0
 			printk("hyfi: no hd to %02X:%02X:%02X:%02X:%02X:%02X\n", da[0],
 					da[1], da[2], da[3],
@@ -107,6 +156,29 @@ static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br,
 #endif
 			/* No such H-Default entry, unlock hd-lock */
 			spin_unlock_bh(&hyfi_br->hash_hd_lock);
+
+			dst = os_br_fdb_get(netdev_priv(hyfi_br->dev), da);
+			/* Try and insert from FDB */
+			if (dst && !dst->is_local) {
+				ha = hyfi_hatbl_insert_from_fdb(hyfi_br, hash, dst->dst, sa,
+					da, hyfi_br->dev->dev_addr,
+					traffic_class, flow->priority, true /* keep_lock */);
+				if (ha) {
+					hyfi_ecm_mark_as_newly_accelerated(
+						num_bytes, num_packets, ha, flow,
+						should_keep_on_fdb_update);
+					spin_unlock(&hyfi_br->hash_ha_lock);
+					return 0;
+				} else {
+#if 0
+					printk("hyfi: Failed to create new accelerated connection to %02X:%02X:%02X:%02X:%02X:%02X from FDB with serial number: %d, hash: 0x%02x",
+						da[0], da[1], da[2], da[3],
+						da[4], da[5], flow->ecm_serial, hash);
+#endif
+					return -1;
+				}
+			}
+			/* Not found in FDB either - can't handle */
 			return 1;
 		}
 	}
@@ -114,8 +186,40 @@ static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br,
 	return 0;
 }
 
+/**
+ * @brief Calculate the weighted average rate
+ *
+ * @param [in] new_rate  most recently calculated rate
+ * @param [in] new_elapsed_time  time over which the most
+ *                               recently calculated rate was
+ *                               calculated over
+ * @param [in] old_rate  previous rate
+ * @param [in] old_elapsed_time  time over which the previous
+ *                               rate was calculated over
+ *
+ * @return weighted average rate
+ */
+static u_int32_t hyfi_ecm_calculate_weighted_average(u_int32_t new_rate,
+	u_int32_t new_elapsed_time, u_int32_t old_rate,
+	u_int32_t old_elapsed_time)
+{
+	u_int32_t new_weighted_rate = new_rate;
+	u_int32_t old_weighted_rate = old_rate;
+
+	if (!new_elapsed_time && !old_elapsed_time) {
+		return 0;
+	}
+
+	new_weighted_rate /= (new_elapsed_time + old_elapsed_time);
+	old_weighted_rate /= (new_elapsed_time + old_elapsed_time);
+
+	return (new_weighted_rate * new_elapsed_time +
+		old_weighted_rate * old_elapsed_time);
+}
+
 int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int32_t hash,
-	u_int8_t *da, u_int8_t *sa, u_int64_t num_bytes, u_int64_t num_packets)
+	u_int8_t *da, u_int8_t *sa, u_int64_t num_bytes, u_int64_t num_packets,
+	u_int32_t time_now, bool *should_keep_on_fdb_update, u_int32_t *new_elapsed_time)
 {
 	struct net_hatbl_entry *ha = NULL;
 	struct hyfi_net_bridge *hyfi_br;
@@ -139,37 +243,101 @@ int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int32_t has
 	/* Find H-Active entry */
 	if (flow->ecm_serial != ~0 && (ha = hatbl_find_ecm(hyfi_br, hash, flow->ecm_serial))) {
 		if (!hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_ACCL_ENTRY)) {
-
 			/* This flow is now accelerated */
-			hyfi_ha_set_flag(ha, HYFI_HACTIVE_TBL_ACCL_ENTRY);
-			ha->prev_num_packets = num_packets;
-			ha->prev_num_bytes = num_bytes;
+			hyfi_ecm_mark_as_newly_accelerated(num_bytes,
+				num_packets, ha, flow, should_keep_on_fdb_update);
+                        *new_elapsed_time = 0;
+		} else {
+                        /* Calculate the rate since the last update */
+			u_int32_t elapsed_time =
+				hyfi_hatbl_calculate_elapsed_time(time_now, flow->last_update);
+                        /* Note that overflow is not handled here.  It is assumed that
+                         * NSS updates will happen more frequently than every 2^32 bytes
+                         */
+			u_int32_t num_sent_bytes = num_bytes - ha->prev_num_bytes;
+			/* Multiply by 8 to convert bytes to bits */
+			u_int32_t rate_now = 0;
+                        if (elapsed_time) {
+                            rate_now = (num_sent_bytes * 8) /
+                                (jiffies_to_msecs(elapsed_time));
+                        }
+			rate_now *= 1000;
 
-			/* Flush seamless buffer - does not apply for accelerate flows */
-			if (hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_SEAMLESS_ENABLED)) {
-				hyfi_ha_clear_flag(ha, HYFI_HACTIVE_TBL_SEAMLESS_ENABLED);
-				hyfi_psw_flush_track_q(&ha->psw_stm_entry);
+			/* If there has been a previous update - calculate weighted
+			 * average rate
+			 */
+			if (ha->num_bytes && ha->rate && flow->last_elapsed_time) {
+				ha->rate = hyfi_ecm_calculate_weighted_average(
+					rate_now, elapsed_time,
+					ha->rate, flow->last_elapsed_time);
+				*new_elapsed_time = elapsed_time + flow->last_elapsed_time;
+			} else {
+				ha->rate = rate_now;
+				*new_elapsed_time = elapsed_time;
 			}
+
+			ha->num_bytes += num_sent_bytes;
+			ha->num_packets += (num_packets - ha->prev_num_packets);
+			ha->prev_num_bytes = num_bytes;
+			ha->prev_num_packets = num_packets;
+#if 0
+			printk("hyfi: Hash 0x%02x, serial=%d, num_bytes=%d, num_packets=%d, rate=%u, elapsed time %u ms, new_elapsed_time %u ms\n",
+				hash, flow->ecm_serial, ha->num_bytes, ha->num_packets,
+				ha->rate, jiffies_to_msecs(elapsed_time),
+				jiffies_to_msecs(*new_elapsed_time));
+#endif
 		}
 
-		ha->num_bytes += num_bytes - ha->prev_num_bytes;
-		ha->num_packets += num_packets - ha->prev_num_packets;
-		ha->prev_num_bytes = num_bytes;
-		ha->prev_num_packets = num_packets;
-
 		spin_unlock_bh(&hyfi_br->hash_ha_lock);
-#if 0
-		printk("hyfi: Updated stats for hash 0x%02x, serial=%d, num_bytes=%d, num_packets=%d\n",
-				hash, flow->ecm_serial, ha->num_bytes, ha->num_packets);
-#endif
+
 		return 0;
 	}
 
 	spin_unlock_bh(&hyfi_br->hash_ha_lock);
 
 	ret = hyfi_ecm_new_connection(hyfi_br, flow, hash, da, sa,
-		num_bytes, num_packets);
+		num_bytes, num_packets, should_keep_on_fdb_update);
+        *new_elapsed_time = 0;
 	return ret;
 }
 
 EXPORT_SYMBOL(hyfi_ecm_update_stats);
+
+void hyfi_ecm_decelerate(u_int32_t hash, u_int32_t ecm_serial)
+{
+	struct net_hatbl_entry *ha = NULL;
+	struct hyfi_net_bridge *hyfi_br;
+	hyfi_br = hyfi_bridge_get(HYFI_BRIDGE_ME);
+
+	if (!hyfi_br) {
+		/* Hy-Fi bridge not attached */
+		return;
+	}
+
+	spin_lock_bh(&hyfi_br->hash_ha_lock);
+
+	ha = hatbl_find_ecm(hyfi_br, hash, ecm_serial);
+	/* Find H-Active entry */
+	if (ha) {
+		/* Clear the accelerated flag and serial number */
+		hyfi_ha_clear_flag(ha, HYFI_HACTIVE_TBL_ACCL_ENTRY);
+		ha->ecm_serial = 0;
+	}
+
+	spin_unlock_bh(&hyfi_br->hash_ha_lock);
+}
+
+EXPORT_SYMBOL(hyfi_ecm_decelerate);
+
+bool hyfi_ecm_should_keep(const struct hyfi_ecm_flow_data_t *flow, uint8_t *mac)
+{
+	if (!memcmp(&flow->da[0], mac, ETH_ALEN)) {
+		/* Need to check the forward */
+		return flow->flag & ECM_HYFI_SHOULD_KEEP_ON_FDB_UPDATE_FWD;
+	} else {
+		/* Need to check the reverse */
+		return flow->flag & ECM_HYFI_SHOULD_KEEP_ON_FDB_UPDATE_REV;
+	}
+}
+
+EXPORT_SYMBOL(hyfi_ecm_should_keep);

@@ -172,7 +172,8 @@ static void hatbl_fillbuf(struct net_hatbl_entry *ha, struct __hatbl_entry *hae)
 		hae->aggr_entry = 0;
 	}
 
-	hae->age = jiffies_to_msecs(jiffies - ha->last_access) / 1000; /* sec */
+	hae->age = hyfi_hatbl_calculate_elapsed_time(jiffies, ha->last_access);
+	hae->age = jiffies_to_msecs(hae->age) / 1000; /* sec */
 	hae->num_packets = ha->num_packets;
 	hae->num_bytes = ha->num_bytes;
 	hae->action = ha->action;
@@ -193,9 +194,11 @@ static void hatbl_fillbuf(struct net_hatbl_entry *ha, struct __hatbl_entry *hae)
 	if (hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_ACCL_ENTRY)) {
 		hae->accl_entry = 1;
 		hae->serial = ha->ecm_serial;
+		hae->reserved = ha->rate;
 	} else {
 		hae->accl_entry = 0;
 		hae->serial = 0;
+		hae->reserved = 0;
 	}
 
 }
@@ -231,6 +234,9 @@ int hyfi_hatbl_fillbuf(struct hyfi_net_bridge *br, void *buf, u_int32_t buf_len,
 			}
 
 			hatbl_fillbuf(ha, hae);
+			if (!ha->num_bytes) {
+				ha->rate = 0;
+			}
 			ha->num_packets = 0;
 			ha->num_bytes = 0;
 
@@ -691,7 +697,7 @@ int hyfi_hatbl_get_entry(struct hyfi_net_bridge *br, u_int8_t hash,
 
 struct net_hatbl_entry* hyfi_hatbl_insert_from_fdb(struct hyfi_net_bridge *br,
 		u_int32_t hash, struct net_bridge_port *dst, const u_int8_t *sa, const u_int8_t *da,
-		const u_int8_t *id, u_int32_t sub_class, u_int32_t priority)
+		const u_int8_t *id, u_int32_t sub_class, u_int32_t priority, bool keep_lock)
 {
 	struct hlist_head *head = &br->hash_ha[hash];
 	struct net_hatbl_entry *ha = NULL;
@@ -710,7 +716,13 @@ struct net_hatbl_entry* hyfi_hatbl_insert_from_fdb(struct hyfi_net_bridge *br,
 		ha = hatbl_create(br, hash, dst, sa, da, id, sub_class, priority, 1);
 
 	} while (false);
-	spin_unlock(&br->hash_ha_lock);
+
+	if (keep_lock && ha) {
+		hyfi_netlink_event_send(HYFI_EVENT_ADD_HA_ENTRY,
+			sizeof(struct __hatbl_entry), ha);
+	} else {
+		spin_unlock(&br->hash_ha_lock);
+	}
 
 	return ha;
 }
@@ -741,7 +753,7 @@ void hyfi_hatbl_update_mcast_stats(struct net_bridge *br, struct sk_buff *skb,
 	} else {
 		hyfi_hatbl_insert_from_fdb(hyfi_br, hash, dst, eth_hdr(skb)->h_source,
 				eth_hdr(skb)->h_dest, br->dev->dev_addr,
-				traffic_class, priority);
+				traffic_class, priority, false /* keep_lock */);
 	}
 }
 
@@ -799,4 +811,16 @@ void hyfi_hatbl_fini(struct hyfi_net_bridge *br)
 	spin_unlock_bh(&br->hash_ha_lock);
 
 	kmem_cache_destroy(hyfi_hatbl_cache);
+}
+
+u_int32_t hyfi_hatbl_calculate_elapsed_time(u_int32_t time_now,
+	u_int32_t time_previous)
+{
+	if (time_now >= time_previous) {
+		/* Non-rollover case */
+		return time_now - time_previous;
+	} else {
+		/* Rollover case */
+		return UINT_MAX - (time_previous - time_now) + 1;
+	}
 }

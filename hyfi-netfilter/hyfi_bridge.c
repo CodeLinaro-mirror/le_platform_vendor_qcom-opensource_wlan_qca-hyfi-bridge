@@ -438,7 +438,7 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 	} else if ((dst = os_br_fdb_get((struct net_bridge *)br, eth_hdr(*skb)->h_dest)) && !dst->is_local) {
         hyfi_hatbl_insert_from_fdb(&hyfi_br, hash, dst->dst, eth_hdr(*skb)->h_source,
                 eth_hdr(*skb)->h_dest, br->dev->dev_addr,
-                traffic_class, priority);
+                traffic_class, priority, false /* keep_lock */);
 
 		return dst->dst;
 	}

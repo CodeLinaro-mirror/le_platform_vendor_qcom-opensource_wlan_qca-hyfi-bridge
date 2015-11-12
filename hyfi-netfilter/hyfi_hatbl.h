@@ -66,6 +66,8 @@ struct net_hatbl_entry {
 	u_int32_t priority;
 	u_int32_t flags;
 	u_int32_t ecm_serial;
+	/* rate in bps */
+	u_int32_t rate;
 
 	struct ha_psw_stm_entry psw_stm_entry;
 	struct psw_flow_info psw_info;
@@ -169,9 +171,21 @@ int hyfi_aggr_init_entry(struct net_hatbl_entry *ha, u_int16_t seq);
 
 struct net_hatbl_entry* hyfi_hatbl_insert_from_fdb(struct hyfi_net_bridge *br,
 		u_int32_t hash, struct net_bridge_port *dst, const u_int8_t *sa, const u_int8_t *da,
-		const u_int8_t *id, u_int32_t sub_class, u_int32_t priority);
+		const u_int8_t *id, u_int32_t sub_class, u_int32_t priority, bool keep_lock);
 
 void hyfi_hatbl_update_mcast_stats(struct net_bridge *br, struct sk_buff *skb,
 		struct net_bridge_port *dst);
+
+/**
+ * @brief Calculate the elapsed time (handling overflow if
+ *        needed)
+ *
+ * @param [in] time_now  current time (in jiffies)
+ * @param [in] time_previous  previous time (in jiffies)
+ *
+ * @return difference between previous time and current time
+ */
+u_int32_t hyfi_hatbl_calculate_elapsed_time(u_int32_t time_now,
+	u_int32_t time_previous);
 
 #endif
