@@ -1,7 +1,7 @@
 /*
  *  QCA HyFi Bridge
  *
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012, 2015-2016, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -380,6 +380,53 @@ static struct net_bridge_port *hyfi_bridge_handle_aggr(struct net_hatbl_entry *h
 	return hyfi_aggr_process_pkt(ha, skb, seq);
 }
 
+/**
+ * @brief Lookup the destination port for a skb (will check
+ *        H-Active, H-Default and FDB)
+ *
+ * @param [in] br  bridge
+ * @param [in] hash  hash calculated from skb
+ * @param [in] traffic_class  traffic class of the skb (UDP or
+ *                            other)
+ * @param [in] priority  priority of the skb
+ * @param [in] skb  skb to determine destination port for
+ * @param [out] ha_out  H-Active entry (if found).  Note is not
+ *                      filled in if created in this function.
+ *
+ * @return destination port if found, NULL if not
+ */
+static struct net_bridge_port *hyfi_bridge_get_dst_port(const struct net_bridge *br,
+	u_int32_t hash, u_int32_t traffic_class,
+	u_int32_t priority, struct sk_buff *skb, struct net_hatbl_entry **ha_out)
+{
+	struct net_hatbl_entry *ha = NULL;
+	struct net_hdtbl_entry *hd;
+	struct net_bridge_fdb_entry *dst;
+
+	/* First, look up in the H-Active table. If not exists, look up in
+	 * the H-Default table. Finally, if not in there, look up in the FDB. */
+	ha = __hyfi_hatbl_get(&hyfi_br, hash, eth_hdr(skb)->h_dest,
+			traffic_class, priority);
+
+	if (ha) {
+		if (ha_out) {
+			*ha_out = ha;
+		}
+		return ha->dst;
+	} else if ((hd = __hyfi_hdtbl_get(&hyfi_br, eth_hdr(skb)->h_dest))) {
+		/* Create a new entry based on H-Default table */
+		return hyfi_bridge_handle_hd(hd, &skb, hash, traffic_class, priority);
+	} else if ((dst = os_br_fdb_get((struct net_bridge *)br, eth_hdr(skb)->h_dest)) && !dst->is_local) {
+		hyfi_hatbl_insert_from_fdb(&hyfi_br, hash, dst->dst, eth_hdr(skb)->h_source,
+			eth_hdr(skb)->h_dest, br->dev->dev_addr,
+			traffic_class, priority, false /* keep_lock */);
+
+		return dst->dst;
+	}
+
+	return NULL;
+}
+
 struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 		struct sk_buff **skb)
 {
@@ -389,9 +436,9 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 	u_int32_t traffic_class;
 	struct net_hatbl_entry *ha = NULL;
 	struct net_hdtbl_entry *hd;
-	struct net_bridge_fdb_entry *dst;
 	u_int16_t seq = ~0;
 	const struct net_bridge *br;
+	struct net_bridge_port *port;
 
 	if (src) {
 		/* Bridged interface */
@@ -422,31 +469,15 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 						HYFI_TRAFFIC_CLASS_OTHER, priority, flag);
 	}
 
-	/* First, look up in the H-Active table. If not exists, look up in
-	 * the H-Default table. Finally, if not in there, look up in the FDB. */
-	ha = __hyfi_hatbl_get(&hyfi_br, hash, eth_hdr(*skb)->h_dest,
-			traffic_class, priority);
+	port = hyfi_bridge_get_dst_port(br, hash, traffic_class,
+		priority, *skb, &ha);
 
-	if (ha) {
+ 	if (ha) {
 		/* Entry found, update stats, and return destination port */
 		if (!hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_RX_ENTRY)) {
 			return hyfi_bridge_handle_ha(ha, skb);
 		}
-	} else if ((hd = __hyfi_hdtbl_get(&hyfi_br, eth_hdr(*skb)->h_dest))) {
-		/* Create a new entry based on H-Default table */
-		return hyfi_bridge_handle_hd(hd, skb, hash, traffic_class, priority);
-	} else if ((dst = os_br_fdb_get((struct net_bridge *)br, eth_hdr(*skb)->h_dest)) && !dst->is_local) {
-        hyfi_hatbl_insert_from_fdb(&hyfi_br, hash, dst->dst, eth_hdr(*skb)->h_source,
-                eth_hdr(*skb)->h_dest, br->dev->dev_addr,
-                traffic_class, priority, false /* keep_lock */);
 
-		return dst->dst;
-	}
-
-	/* This section handles the tracked flows case.
-	 * Handle each case separately.
-	 */
-	if (ha) {
 		if (flag & IS_HYFI_AGGR_FLOW) {
 			return hyfi_bridge_handle_aggr(ha, skb, seq);
 		}
@@ -462,6 +493,10 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 			hyfi_psw_throttle(&hyfi_br, ha, skb, HYFI_FORWARD_PKT);
 			return ha->dst;
 		}
+	}
+
+	if (port) {
+		return port;
 	}
 
 	if(unlikely(flag & (IS_HYFI_PKT | IS_HYFI_IP_PKT))) {
@@ -502,6 +537,29 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 	return NULL;
 }
 
+struct net_bridge_port *hyfi_bridge_port_dev_get(struct net_device *dev,
+	struct sk_buff *skb)
+{
+	/* hybrid look up first */
+	u_int32_t flag, priority;
+	u_int32_t hash;
+	u_int32_t traffic_class;
+	u_int16_t seq = ~0;
+	const struct net_bridge *br = netdev_priv(dev);
+
+	if (unlikely(!br || !hyfi_br.dev || dev != hyfi_br.dev))
+		return NULL;
+
+	if (unlikely(hyfi_hash_skbuf(skb, &hash, &flag, &priority, &seq)))
+		return NULL;
+
+	traffic_class = (flag & IS_IPPROTO_UDP) ?
+			HYFI_TRAFFIC_CLASS_UDP : HYFI_TRAFFIC_CLASS_OTHER;
+
+	return hyfi_bridge_get_dst_port(br, hash, traffic_class,
+		priority, skb, NULL);
+}
+
 int hyfi_bridge_should_deliver(const struct hyfi_net_bridge_port *src,
 		const struct hyfi_net_bridge_port *dst, const struct sk_buff *skb)
 {
@@ -534,6 +592,7 @@ static int hyfi_bridge_deinit_bridge_device(void)
 	mc_detach(&hyfi_br);
 
 	rcu_assign_pointer(br_get_dst_hook, NULL);
+	rcu_assign_pointer(br_port_dev_get_hook, NULL);
 
 	hyfi_bridge_del_ports();
 
@@ -576,6 +635,9 @@ static int hyfi_bridge_init_bridge_device(const char *br_name)
 
 	/* see br_input.c */
 	rcu_assign_pointer(br_get_dst_hook, hyfi_bridge_get_dst);
+
+	/* see br_if.c */
+	rcu_assign_pointer(br_port_dev_get_hook, hyfi_bridge_port_dev_get);
 
 	/* Multicast module attach to the bridge */
 	if (mc_attach(&hyfi_br)<0)

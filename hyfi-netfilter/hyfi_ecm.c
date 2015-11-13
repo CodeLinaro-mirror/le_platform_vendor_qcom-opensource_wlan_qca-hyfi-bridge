@@ -1,7 +1,7 @@
 /*
  *  QCA Hy-Fi ECM
  *
- * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -49,7 +49,7 @@ static void hyfi_ecm_mark_as_newly_accelerated(u_int64_t num_bytes, u_int64_t nu
 #if 0
 	printk("hyfi: New accelerated connection with serial number (prev): %d (%d), hash: 0x%02x, should_keep %d\n",
 		flow->ecm_serial, ha->ecm_serial, ha->hash,
-               !hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_STATIC_ENTRY));
+ 		!hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_STATIC_ENTRY));
 #endif
 
 	hyfi_ha_set_flag(ha, HYFI_HACTIVE_TBL_ACCL_ENTRY);
@@ -88,12 +88,14 @@ static void hyfi_ecm_mark_as_newly_accelerated(u_int64_t num_bytes, u_int64_t nu
 
 static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br,
 	const struct hyfi_ecm_flow_data_t *flow, u_int32_t hash,
-	u_int8_t *da, u_int8_t *sa, u_int64_t num_bytes, u_int64_t num_packets,
-	bool *should_keep_on_fdb_update)
+	const u_int8_t *da, const u_int8_t *sa, struct net_hatbl_entry **ha_ret,
+	bool *unlock_bh)
 {
 	u_int32_t traffic_class;
 	struct net_hatbl_entry *ha = NULL;
+	*unlock_bh = true;
 
+	*ha_ret = NULL;
 	traffic_class = (flow->flag & ECM_HYFI_IS_IPPROTO_UDP) ?
 			HYFI_TRAFFIC_CLASS_UDP : HYFI_TRAFFIC_CLASS_OTHER;
 
@@ -103,11 +105,7 @@ static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br,
 	ha = hatbl_find(hyfi_br, hash, da, traffic_class, flow->priority);
 
 	if (ha) {
-		/* Found. Update ecm serial number and return */
-		hyfi_ecm_mark_as_newly_accelerated(
-			num_bytes, num_packets, ha, flow, should_keep_on_fdb_update);
-		spin_unlock_bh(&hyfi_br->hash_ha_lock);
-
+		*ha_ret = ha;
 		return 0;
 
 	} else {
@@ -134,10 +132,7 @@ static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br,
 
 			if(ha) {
 				/* H-Active created. */
-				hyfi_ecm_mark_as_newly_accelerated(
-					num_bytes, num_packets, ha, flow,
-					should_keep_on_fdb_update);
-				spin_unlock_bh(&hyfi_br->hash_ha_lock);
+				*ha_ret = ha;
 				return 0;
 			} else {
 #if 0
@@ -164,10 +159,8 @@ static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br,
 					da, hyfi_br->dev->dev_addr,
 					traffic_class, flow->priority, true /* keep_lock */);
 				if (ha) {
-					hyfi_ecm_mark_as_newly_accelerated(
-						num_bytes, num_packets, ha, flow,
-						should_keep_on_fdb_update);
-					spin_unlock(&hyfi_br->hash_ha_lock);
+					*ha_ret = ha;
+					*unlock_bh = false;
 					return 0;
 				} else {
 #if 0
@@ -223,6 +216,7 @@ int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int32_t has
 {
 	struct net_hatbl_entry *ha = NULL;
 	struct hyfi_net_bridge *hyfi_br;
+	bool unlock_bh;
 	int ret = 0;
 
 	if(!num_bytes || !num_packets)
@@ -246,21 +240,21 @@ int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int32_t has
 			/* This flow is now accelerated */
 			hyfi_ecm_mark_as_newly_accelerated(num_bytes,
 				num_packets, ha, flow, should_keep_on_fdb_update);
-                        *new_elapsed_time = 0;
+			*new_elapsed_time = 0;
 		} else {
                         /* Calculate the rate since the last update */
 			u_int32_t elapsed_time =
 				hyfi_hatbl_calculate_elapsed_time(time_now, flow->last_update);
-                        /* Note that overflow is not handled here.  It is assumed that
-                         * NSS updates will happen more frequently than every 2^32 bytes
-                         */
+			/* Note that overflow is not handled here.  It is assumed that
+			 * NSS updates will happen more frequently than every 2^32 bytes
+			 */
 			u_int32_t num_sent_bytes = num_bytes - ha->prev_num_bytes;
 			/* Multiply by 8 to convert bytes to bits */
 			u_int32_t rate_now = 0;
-                        if (elapsed_time) {
-                            rate_now = (num_sent_bytes * 8) /
-                                (jiffies_to_msecs(elapsed_time));
-                        }
+			if (elapsed_time) {
+				rate_now = (num_sent_bytes * 8) /
+					(jiffies_to_msecs(elapsed_time));
+			}
 			rate_now *= 1000;
 
 			/* If there has been a previous update - calculate weighted
@@ -296,9 +290,25 @@ int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int32_t has
 	spin_unlock_bh(&hyfi_br->hash_ha_lock);
 
 	ret = hyfi_ecm_new_connection(hyfi_br, flow, hash, da, sa,
-		num_bytes, num_packets, should_keep_on_fdb_update);
-        *new_elapsed_time = 0;
-	return ret;
+		&ha, &unlock_bh);
+
+	 *new_elapsed_time = 0;
+
+	if (ha) {
+		/* Found. Update ecm serial number and return */
+		hyfi_ecm_mark_as_newly_accelerated(
+			num_bytes, num_packets, ha, flow, should_keep_on_fdb_update);
+		if (unlock_bh) {
+			spin_unlock_bh(&hyfi_br->hash_ha_lock);
+		} else {
+			spin_unlock(&hyfi_br->hash_ha_lock);
+		}
+
+		return 0;
+
+	} else {
+		return ret;
+	}
 }
 
 EXPORT_SYMBOL(hyfi_ecm_update_stats);
@@ -341,3 +351,123 @@ bool hyfi_ecm_should_keep(const struct hyfi_ecm_flow_data_t *flow, uint8_t *mac)
 }
 
 EXPORT_SYMBOL(hyfi_ecm_should_keep);
+
+bool hyfi_ecm_port_matches(const struct hyfi_ecm_flow_data_t *flow,
+	int32_t to_system_index, int32_t from_system_index)
+{
+	struct net_hatbl_entry *ha = NULL;
+	struct hyfi_net_bridge *hyfi_br;
+	u_int32_t traffic_class;
+	bool ret = false;
+	bool unlock_bh;
+	hyfi_br = hyfi_bridge_get(HYFI_BRIDGE_ME);
+
+	if (!hyfi_br) {
+		/* Hy-Fi bridge not attached */
+		return true;
+	}
+
+	traffic_class = (flow->flag & ECM_HYFI_IS_IPPROTO_UDP) ?
+		HYFI_TRAFFIC_CLASS_UDP : HYFI_TRAFFIC_CLASS_OTHER;
+
+	/* Find H-Active entry - forward first */
+	/* Note not being able to find the entry or having an invalid
+	 *index is also OK - it just means HyFi is not interested in
+	 *this direction / flow, and should ignore it
+	 */
+	if (to_system_index != -1) {
+		hyfi_ecm_new_connection(hyfi_br, flow, flow->hash, flow->da, flow->sa,
+			&ha, &unlock_bh);
+		if (!ha) {
+			ret = true;
+		} else {
+			if (ha->dst->dev->ifindex != to_system_index) {
+#if 0
+				printk("%x: to connection iface %d != H-Active intf %d (%s)\n",
+					flow->hash, to_system_index, ha->dst->dev->ifindex,
+					ha->dst->dev->name);
+#endif
+			} else {
+				ret = true;
+			}
+
+			if (unlock_bh) {
+				spin_unlock_bh(&hyfi_br->hash_ha_lock);
+			} else {
+				spin_unlock(&hyfi_br->hash_ha_lock);
+			}
+		}
+	} else {
+		ret = true;
+	}
+
+	if (ret && from_system_index != -1) {
+		hyfi_ecm_new_connection(hyfi_br, flow, flow->reverse_hash,
+			flow->sa, flow->da, &ha, &unlock_bh);
+		if (ha) {
+			if (ha->dst->dev->ifindex != from_system_index) {
+#if 0
+				printk("%x: from connection iface %d != H-Active intf %d (%s)\n",
+					flow->reverse_hash, from_system_index, ha->dst->dev->ifindex,
+					ha->dst->dev->name);
+#endif
+				ret = false;
+			}
+
+			if (unlock_bh) {
+				spin_unlock_bh(&hyfi_br->hash_ha_lock);
+			} else {
+				spin_unlock(&hyfi_br->hash_ha_lock);
+			}
+		}
+	}
+
+	return ret;
+}
+
+EXPORT_SYMBOL(hyfi_ecm_port_matches);
+
+bool hyfi_ecm_is_port_on_hyfi_bridge(int32_t system_index)
+{
+	struct hyfi_net_bridge *hyfi_br;
+	struct net_device *dev;
+
+	hyfi_br = hyfi_bridge_get(HYFI_BRIDGE_ME);
+
+	if (!hyfi_br) {
+		/* Hy-Fi bridge not attached */
+		return false;
+	}
+
+	dev = dev_get_by_index(&init_net, system_index);
+	if (dev) {
+		bool ret = false;
+		if (hyfi_bridge_get_port_by_dev(dev)) {
+			/* Is a HyFi bridge port */
+			ret = true;
+		}
+		dev_put(dev);
+		return ret;
+	}
+
+	/* Is not a HyFi bridge port */
+	return false;
+}
+
+EXPORT_SYMBOL(hyfi_ecm_is_port_on_hyfi_bridge);
+
+bool hyfi_ecm_bridge_attached(void)
+{
+	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get(HYFI_BRIDGE_ME);
+
+	if (!hyfi_br) {
+		/* Hy-Fi bridge not attached */
+		return false;
+	}
+
+	return true;
+}
+
+EXPORT_SYMBOL(hyfi_ecm_bridge_attached);
+
+

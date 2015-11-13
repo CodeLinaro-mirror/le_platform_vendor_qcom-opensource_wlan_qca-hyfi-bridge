@@ -1,7 +1,7 @@
 /*
  *  QCA Hy-Fi ECM
  *
- * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -90,5 +90,38 @@ void hyfi_ecm_decelerate(u_int32_t hash, u_int32_t ecm_serial);
  *         otherwise
  */
 bool hyfi_ecm_should_keep(const struct hyfi_ecm_flow_data_t *flow, uint8_t *mac);
+
+/**
+ * @brief Determine if the port provided by ECM matches the HyFi
+ *        expectation
+ *
+ * @param [in] flow  HyFi / ECM state for the flow
+ * @param [in] to_system_index  system index in the 'to'
+ *                              direction provided by ECM
+ * @param [in] from_system_index  system index in the 'from'
+ *                                direction provided by ECM
+ *
+ * @return true if ECM and HyFi agree on egress ports, false
+ *         otherwise
+ */
+bool hyfi_ecm_port_matches(const struct hyfi_ecm_flow_data_t *flow,
+	int32_t to_system_index, int32_t from_system_index);
+
+/**
+ * @brief Determine if a device is attached to the HyFi bridge
+ *
+ * @param [in] system_index  system index of the device
+ *
+ * @return true if system_index is for a device attached to the
+ *         HyFi bridge, false if not
+ */
+bool hyfi_ecm_is_port_on_hyfi_bridge(int32_t system_index);
+
+/**
+ * @brief Determine if the HyFi bridge is attached
+ *
+ * @return true if the HyFi bridge is attached, false if not
+ */
+bool hyfi_ecm_bridge_attached(void);
 
 #endif /* HYFI_ECM_H_ */
