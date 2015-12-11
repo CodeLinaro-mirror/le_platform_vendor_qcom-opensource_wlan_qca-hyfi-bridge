@@ -73,7 +73,7 @@ int hyfi_bridge_set_bridge_name(const char *br_name)
 	}
 
 	/* Update new bridge */
-	hyfi_bridge_init_bridge_device(br_name);
+	retval = hyfi_bridge_init_bridge_device(br_name);
 
 	spin_unlock_bh(&hyfi_br.lock);
 	return retval;
@@ -578,7 +578,8 @@ static int hyfi_bridge_init_bridge_device(const char *br_name)
 	rcu_assign_pointer(br_get_dst_hook, hyfi_bridge_get_dst);
 
 	/* Multicast module attach to the bridge */
-	mc_attach(&hyfi_br);
+	if (mc_attach(&hyfi_br)<0)
+            return -1;
 
 	printk(KERN_INFO"hyfi: Bridge %s is now attached\n", br_dev->name);
 

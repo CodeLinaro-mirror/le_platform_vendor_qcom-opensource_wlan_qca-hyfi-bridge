@@ -62,9 +62,9 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				if (br) {
 					printk("hyfi: Already attached to bridge %s\n",
 							br->dev->name);
-					hymsghdr->status = HYFI_STATUS_FAILURE;
 				} else {
 					if (hyfi_bridge_set_bridge_name(hymsghdr->if_name)) {
+					        printk("hyfi: failed to attach bridge %s\n",hymsghdr->if_name);
 						hymsghdr->status = HYFI_STATUS_FAILURE;
 					}
 				}

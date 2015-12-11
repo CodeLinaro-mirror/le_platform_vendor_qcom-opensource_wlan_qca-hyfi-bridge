@@ -9,7 +9,7 @@
 #ifndef _MC_FORWARD_H_
 #define _MC_FORWARD_H_
 
-int __init mc_forward_init(void);
+int mc_forward_init(void);
 void mc_forward_exit(void);
 
 #endif

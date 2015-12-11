@@ -392,8 +392,11 @@ static int mc_process(const struct net_bridge_port *src, struct sk_buff *skb)
 
 int mc_forward_init(void)
 {
+    if (rcu_dereference(br_multicast_handle_hook) != NULL) {
+        printk("%s: br_multicast_hook is being used. HyFi-multicast-bridge module will not work.\n",__func__); 
+        return -1;
+    }
     rcu_assign_pointer(br_multicast_handle_hook, mc_process);
-
     return 0;
 }
 

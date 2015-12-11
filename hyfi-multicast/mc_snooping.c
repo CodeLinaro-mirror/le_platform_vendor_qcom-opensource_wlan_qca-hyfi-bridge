@@ -29,6 +29,7 @@
 
 #include "mc_private.h"
 #include "mc_netlink.h"
+#include "mc_forward.h"
 #include "hyfi_bridge.h"
 
 int mc_group_hash(__be32 mdb_salt, __be32 group)
@@ -2431,6 +2432,12 @@ int mc_open(struct hyfi_net_bridge *hyfi_br, struct mc_struct *mc)
     }
 
     spin_lock(&mc->lock);
+    if (mc_forward_init() != 0) {
+        spin_unlock(&mc->lock);
+        MC_PRINT(KERN_DEBUG "%s: mc forward init failed \n", __func__);
+        return -EINVAL;
+    }
+
     mc->ageing_query = jiffies;
     mc->startup_queries_sent = 0;
     mc->started = 1;
@@ -2460,6 +2467,8 @@ int mc_stop(struct mc_struct *mc)
         MC_PRINT(KERN_DEBUG "%s: mc function is already disabled!\n", __func__);
         return 0;
     }
+
+    mc_forward_exit();
 
     spin_lock_bh(&mc->lock);
     mc->started = 0;
@@ -2751,6 +2760,7 @@ static void mc_event_delay(unsigned long data)
 
 int mc_attach(struct hyfi_net_bridge *hyfi_br)
 {
+    int retval = 0; 
     struct mc_struct *mc = MC_DEV(hyfi_br);
 
     if(mc) {
@@ -2808,9 +2818,9 @@ int mc_attach(struct hyfi_net_bridge *hyfi_br)
             (unsigned long)mc);
 
     hyfi_br->mc = mc;
-    mc_open(hyfi_br, mc);
 
-    return 0;
+    retval = mc_open(hyfi_br, mc);
+    return retval;
 }
 
 void mc_detach(struct hyfi_net_bridge *hyfi_br)

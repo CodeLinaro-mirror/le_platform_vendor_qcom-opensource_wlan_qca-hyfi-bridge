@@ -25,13 +25,8 @@ int __init mc_init(void)
     if (mc_snooping_init())
         goto err2;
 
-    if( mc_forward_init() )
-        goto err3;
-
     printk("QCA Hy-Fi multicast installation successfully\n");
 	return 0;
-err3:
-    mc_snooping_exit();
 err2:
     mc_netfilter_exit();
 err1:
@@ -43,11 +38,10 @@ err0:
 
 void __exit mc_exit(void)
 {
-    mc_forward_exit();
     mc_netlink_exit();
     mc_netfilter_exit();
     mc_snooping_exit();
 
-	printk( "QCA Hy-Fi multicast uninstalled\n" );
+    printk( "QCA Hy-Fi multicast uninstalled\n" );
 }
 
