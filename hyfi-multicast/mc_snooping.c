@@ -2468,9 +2468,8 @@ int mc_stop(struct mc_struct *mc)
         return 0;
     }
 
-    mc_forward_exit();
-
     spin_lock_bh(&mc->lock);
+    mc_forward_exit();
     mc->started = 0;
 
     mc_mdb_flush(mc);
