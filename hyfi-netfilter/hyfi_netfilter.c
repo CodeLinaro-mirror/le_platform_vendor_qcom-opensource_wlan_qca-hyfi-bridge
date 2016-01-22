@@ -1,7 +1,7 @@
 /*
  *  QCA HyFi Netfilter
  *
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -107,8 +107,8 @@ unsigned int hyfi_netfilter_forwarding_hook(unsigned int hooknum,
 {
 	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(out);
 	struct net_bridge_port *br_port = hyfi_br_port_get(out);
-	struct hyfi_net_bridge_port *hyfi_dst_p = hyfi_bridge_get_port(br_port);
-	struct hyfi_net_bridge_port *hyfi_src_p = hyfi_bridge_get_port_by_dev(in);
+	struct hyfi_net_bridge_port *hyfi_dst_p;
+	struct hyfi_net_bridge_port *hyfi_src_p;
 
 	if (unlikely(!hyfi_br || !br_port))
 		return NF_ACCEPT;
@@ -121,6 +121,9 @@ unsigned int hyfi_netfilter_forwarding_hook(unsigned int hooknum,
 		/* Do not forward IEEE1905.1 and HCP Bcast/Mcast packets */
 		return NF_DROP;
 	}
+
+	hyfi_dst_p = hyfi_bridge_get_port(br_port);
+	hyfi_src_p = hyfi_bridge_get_port_by_dev(in);
 
 	/* Should deliver */
 	if (!hyfi_bridge_should_deliver(hyfi_src_p, hyfi_dst_p, skb)) {

@@ -1,7 +1,7 @@
 /*
  *  QCA HyFi Netfilter
  *
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -66,12 +66,11 @@ static int __init hyfi_init(void)
 
 static void __exit hyfi_exit(void)
 {
-    mc_exit();
-
-	hyfi_bridge_fini();
-	hyfi_netfilter_fini();
 	hyfi_netlink_fini();
-    hyfi_notify_fini();
+	hyfi_notify_fini();
+	hyfi_netfilter_fini();
+	mc_exit();
+	hyfi_bridge_fini();
 
 	printk( "QCA Hy-Fi netfilter uninstalled\n" );
 }

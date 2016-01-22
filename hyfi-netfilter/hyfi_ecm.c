@@ -431,27 +431,27 @@ bool hyfi_ecm_is_port_on_hyfi_bridge(int32_t system_index)
 {
 	struct hyfi_net_bridge *hyfi_br;
 	struct net_device *dev;
+	bool ret = false;
 
 	hyfi_br = hyfi_bridge_get(HYFI_BRIDGE_ME);
 
 	if (!hyfi_br) {
 		/* Hy-Fi bridge not attached */
-		return false;
+		return ret;
 	}
 
-	dev = dev_get_by_index(&init_net, system_index);
+	rcu_read_lock();
+	dev = dev_get_by_index_rcu(&init_net, system_index);
 	if (dev) {
-		bool ret = false;
 		if (hyfi_bridge_get_port_by_dev(dev)) {
 			/* Is a HyFi bridge port */
 			ret = true;
 		}
-		dev_put(dev);
-		return ret;
 	}
 
-	/* Is not a HyFi bridge port */
-	return false;
+	rcu_read_unlock();
+
+	return ret;
 }
 
 EXPORT_SYMBOL(hyfi_ecm_is_port_on_hyfi_bridge);
