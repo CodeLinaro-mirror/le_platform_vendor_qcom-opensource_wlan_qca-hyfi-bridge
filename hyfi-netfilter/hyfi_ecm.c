@@ -235,7 +235,8 @@ int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int32_t has
 	spin_lock_bh(&hyfi_br->hash_ha_lock);
 
 	/* Find H-Active entry */
-	if (flow->ecm_serial != ~0 && (ha = hatbl_find_ecm(hyfi_br, hash, flow->ecm_serial))) {
+	if (flow->ecm_serial != ~0 &&
+		(ha = hatbl_find_ecm(hyfi_br, hash, flow->ecm_serial, da))) {
 		if (!hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_ACCL_ENTRY)) {
 			/* This flow is now accelerated */
 			hyfi_ecm_mark_as_newly_accelerated(num_bytes,
@@ -313,7 +314,7 @@ int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int32_t has
 
 EXPORT_SYMBOL(hyfi_ecm_update_stats);
 
-void hyfi_ecm_decelerate(u_int32_t hash, u_int32_t ecm_serial)
+void hyfi_ecm_decelerate(u_int32_t hash, u_int32_t ecm_serial, u_int8_t *da)
 {
 	struct net_hatbl_entry *ha = NULL;
 	struct hyfi_net_bridge *hyfi_br;
@@ -326,7 +327,7 @@ void hyfi_ecm_decelerate(u_int32_t hash, u_int32_t ecm_serial)
 
 	spin_lock_bh(&hyfi_br->hash_ha_lock);
 
-	ha = hatbl_find_ecm(hyfi_br, hash, ecm_serial);
+	ha = hatbl_find_ecm(hyfi_br, hash, ecm_serial, da);
 	/* Find H-Active entry */
 	if (ha) {
 		/* Clear the accelerated flag and serial number */

@@ -314,7 +314,7 @@ struct net_hatbl_entry *hatbl_find(struct hyfi_net_bridge *br, u_int32_t hash,
 }
 
 struct net_hatbl_entry *hatbl_find_ecm(struct hyfi_net_bridge *br, u_int32_t hash,
-		u_int32_t ecm_serial)
+		u_int32_t ecm_serial, const unsigned char *da)
 {
 	struct hlist_node *h;
 	struct net_hatbl_entry *ha;
@@ -323,7 +323,8 @@ struct net_hatbl_entry *hatbl_find_ecm(struct hyfi_net_bridge *br, u_int32_t has
 		return NULL;
 
 	os_hlist_for_each_entry(ha, h, &br->hash_ha[hash], hlist) {
-		if (ha->ecm_serial == ecm_serial){
+		if (ha->ecm_serial == ecm_serial &&
+			!compare_ether_addr(ha->da.addr, da)) {
 			ha->last_access = jiffies;
 			return ha;
 		}

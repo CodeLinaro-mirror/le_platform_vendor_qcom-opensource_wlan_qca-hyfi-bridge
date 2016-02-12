@@ -76,8 +76,10 @@ int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int32_t has
  * @param [in] hash  hash of entry to decelerate
  * @param [in] ecm_serial  ECM serial number of entry to
  *                         decelerate
+ * @param [in] da  destination MAC address of the flow to
+ *                 decelerate
  */
-void hyfi_ecm_decelerate(u_int32_t hash, u_int32_t ecm_serial);
+void hyfi_ecm_decelerate(u_int32_t hash, u_int32_t ecm_serial, u_int8_t *da);
 
 /**
  * @brief Check if an ECM connection should be kept.

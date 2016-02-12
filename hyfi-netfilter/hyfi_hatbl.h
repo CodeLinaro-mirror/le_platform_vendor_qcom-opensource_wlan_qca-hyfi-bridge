@@ -124,7 +124,7 @@ static inline struct net_hatbl_entry* __hyfi_hatbl_get(
 struct net_hatbl_entry *hatbl_find(struct hyfi_net_bridge *br, u_int32_t hash,
 		const unsigned char *da, u_int32_t sub_class, u_int32_t priority);
 struct net_hatbl_entry *hatbl_find_ecm(struct hyfi_net_bridge *br, u_int32_t hash,
-		u_int32_t ecm_serial);
+		u_int32_t ecm_serial, const unsigned char *da);
 extern int hyfi_hatbl_init(struct hyfi_net_bridge *br);
 extern void hyfi_hatbl_fini(struct hyfi_net_bridge *br);
 extern void hyfi_hatbl_flush(struct hyfi_net_bridge *br);
