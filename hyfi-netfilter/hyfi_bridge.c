@@ -390,6 +390,8 @@ static struct net_bridge_port *hyfi_bridge_handle_aggr(struct net_hatbl_entry *h
  *                            other)
  * @param [in] priority  priority of the skb
  * @param [in] skb  skb to determine destination port for
+ * @param [in] dest_addr  MAC address of the destination
+ * @param [in] src_addr  MAC address of the source
  * @param [out] ha_out  H-Active entry (if found).  Note is not
  *                      filled in if created in this function.
  *
@@ -397,7 +399,9 @@ static struct net_bridge_port *hyfi_bridge_handle_aggr(struct net_hatbl_entry *h
  */
 static struct net_bridge_port *hyfi_bridge_get_dst_port(const struct net_bridge *br,
 	u_int32_t hash, u_int32_t traffic_class,
-	u_int32_t priority, struct sk_buff *skb, struct net_hatbl_entry **ha_out)
+	u_int32_t priority, struct sk_buff *skb,
+	const unsigned char *dest_addr, const unsigned char *src_addr,
+	struct net_hatbl_entry **ha_out)
 {
 	struct net_hatbl_entry *ha = NULL;
 	struct net_hdtbl_entry *hd;
@@ -405,7 +409,7 @@ static struct net_bridge_port *hyfi_bridge_get_dst_port(const struct net_bridge 
 
 	/* First, look up in the H-Active table. If not exists, look up in
 	 * the H-Default table. Finally, if not in there, look up in the FDB. */
-	ha = __hyfi_hatbl_get(&hyfi_br, hash, eth_hdr(skb)->h_dest,
+	ha = __hyfi_hatbl_get(&hyfi_br, hash, dest_addr,
 			traffic_class, priority);
 
 	if (ha) {
@@ -413,18 +417,70 @@ static struct net_bridge_port *hyfi_bridge_get_dst_port(const struct net_bridge 
 			*ha_out = ha;
 		}
 		return ha->dst;
-	} else if ((hd = __hyfi_hdtbl_get(&hyfi_br, eth_hdr(skb)->h_dest))) {
+	} else if ((hd = __hyfi_hdtbl_get(&hyfi_br, dest_addr))) {
 		/* Create a new entry based on H-Default table */
 		return hyfi_bridge_handle_hd(hd, &skb, hash, traffic_class, priority);
-	} else if ((dst = os_br_fdb_get((struct net_bridge *)br, eth_hdr(skb)->h_dest)) && !dst->is_local) {
-		hyfi_hatbl_insert_from_fdb(&hyfi_br, hash, dst->dst, eth_hdr(skb)->h_source,
-			eth_hdr(skb)->h_dest, br->dev->dev_addr,
+	} else if ((dst = os_br_fdb_get((struct net_bridge *)br, dest_addr)) && !dst->is_local) {
+		hyfi_hatbl_insert_from_fdb(&hyfi_br, hash, dst->dst, src_addr,
+			dest_addr, br->dev->dev_addr,
 			traffic_class, priority, false /* keep_lock */);
 
 		return dst->dst;
 	}
 
 	return NULL;
+}
+
+/**
+ * @brief Lookup the port to use to reach a destination MAC in
+ *        H-Default and FDB only
+ *
+ * Will not create a H-Active entry
+ *
+ * @param [in] br  bridge
+ * @param [in] traffic_class  traffic class (UDP or other)
+ * @param [in] addr  MAC address of the destination
+ *
+ * @return destination port if found, NULL if not
+ */
+static struct net_bridge_port *hyfi_bridge_get_dst_port_no_hash(
+	const struct net_bridge *br, u_int32_t traffic_class,
+	const unsigned char *addr)
+{
+	struct net_hdtbl_entry *hd;
+	struct net_bridge_fdb_entry *dst;
+
+	hd = __hyfi_hdtbl_get(&hyfi_br, addr);
+	if (hd) {
+		if (traffic_class == HYFI_TRAFFIC_CLASS_UDP) {
+#if 0
+			printk("0x%x: Match in H-Default, sending on port %s\n", hash,
+				hd->dst_udp->dev->name);
+#endif
+			return hd->dst_udp;
+		} else {
+#if 0
+			printk("0x%x: Match in H-Default, sending on port %s\n", hash,
+				hd->dst_other->dev->name);
+#endif
+			return hd->dst_other;
+		}
+	} else {
+		dst = os_br_fdb_get((struct net_bridge *)br, addr);
+		if (dst && !dst->is_local) {
+#if 0
+			printk("0x%x: Match in FDB, sending on port %s\n", hash,
+				dst->dst->dev->name);
+#endif
+			return dst->dst;
+		} else {
+#if 0
+			printk("0x%x: No match found for %x:%x:%x:%x:%x:%x\n", hash,
+				addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
+#endif
+			return NULL;
+		}
+	}
 }
 
 struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
@@ -470,7 +526,7 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 	}
 
 	port = hyfi_bridge_get_dst_port(br, hash, traffic_class,
-		priority, *skb, &ha);
+		priority, *skb, eth_hdr(*skb)->h_dest, eth_hdr(*skb)->h_source, &ha);
 
  	if (ha) {
 		/* Entry found, update stats, and return destination port */
@@ -538,7 +594,7 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 }
 
 struct net_bridge_port *hyfi_bridge_port_dev_get(struct net_device *dev,
-	struct sk_buff *skb)
+	struct sk_buff *skb, unsigned char *addr)
 {
 	/* hybrid look up first */
 	u_int32_t flag, priority;
@@ -546,6 +602,7 @@ struct net_bridge_port *hyfi_bridge_port_dev_get(struct net_device *dev,
 	u_int32_t traffic_class;
 	u_int16_t seq = ~0;
 	const struct net_bridge *br = netdev_priv(dev);
+	const unsigned char *dest_addr, *src_addr;
 
 	if (unlikely(!br || !hyfi_br.dev || dev != hyfi_br.dev))
 		return NULL;
@@ -554,10 +611,67 @@ struct net_bridge_port *hyfi_bridge_port_dev_get(struct net_device *dev,
 		return NULL;
 
 	traffic_class = (flag & IS_IPPROTO_UDP) ?
-			HYFI_TRAFFIC_CLASS_UDP : HYFI_TRAFFIC_CLASS_OTHER;
+		HYFI_TRAFFIC_CLASS_UDP : HYFI_TRAFFIC_CLASS_OTHER;
+
+	/* Determine which hash to use */
+	if (memcmp(eth_hdr(skb)->h_dest, addr, ETH_ALEN) &&
+		memcmp(eth_hdr(skb)->h_source, addr, ETH_ALEN)) {
+
+#if 0
+		dest_addr = eth_hdr(skb)->h_dest;
+		src_addr = eth_hdr(skb)->h_source;
+
+		printk("0x%x: Addr %x:%x:%x:%x:%x:%x doesn't match dest_addr "
+			"%x:%x:%x:%x:%x:%x or src_addr %x:%x:%x:%x:%x:%x\n", hash,
+			addr[0], addr[1], addr[2], addr[3], addr[4], addr[5],
+			dest_addr[0], dest_addr[1], dest_addr[2], dest_addr[3],
+			dest_addr[4], dest_addr[5],
+			src_addr[0], src_addr[1], src_addr[2], src_addr[3],
+			src_addr[4], src_addr[5]);
+#endif
+
+		/*
+		 * Mismatch on source and destination, but we have been given
+		 * the next-hop MAC address. Can't use the skb to determine
+		 * the egress port, so can't use or create a H-Active entry.
+		 * However, can determine the egress port from addr by looking up
+		 * in H-Default and FDB
+		 */
+		return hyfi_bridge_get_dst_port_no_hash(br, traffic_class, addr);
+	} else if (memcmp(eth_hdr(skb)->h_dest, addr, ETH_ALEN)) {
+		/* Should be using reverse hash */
+		if (unlikely(hyfi_hash_skbuf_reverse(skb, &hash)))
+			return NULL;
+		dest_addr = eth_hdr(skb)->h_source;
+		src_addr = eth_hdr(skb)->h_dest;
+#if 0
+		printk("0x%x: Using reverse hash, addr %x:%x:%x:%x:%x:%x, "
+			"dest_addr %x:%x:%x:%x:%x:%x src_addr %x:%x:%x:%x:%x:%x\n",
+			hash,
+			addr[0], addr[1], addr[2], addr[3], addr[4], addr[5],
+			dest_addr[0], dest_addr[1], dest_addr[2], dest_addr[3],
+			dest_addr[4], dest_addr[5],
+			src_addr[0], src_addr[1], src_addr[2], src_addr[3],
+			src_addr[4], src_addr[5]);
+#endif
+	} else {
+		/* Should be using forward hash */
+		dest_addr = eth_hdr(skb)->h_dest;
+		src_addr = eth_hdr(skb)->h_source;
+#if 0
+		printk("0x%x: Using forward hash, addr %x:%x:%x:%x:%x:%x, "
+			"dest_addr %x:%x:%x:%x:%x:%x src_addr %x:%x:%x:%x:%x:%x\n",
+			hash,
+			addr[0], addr[1], addr[2], addr[3], addr[4], addr[5],
+			dest_addr[0], dest_addr[1], dest_addr[2], dest_addr[3],
+			dest_addr[4], dest_addr[5],
+			src_addr[0], src_addr[1], src_addr[2], src_addr[3],
+			src_addr[4], src_addr[5]);
+#endif
+	}
 
 	return hyfi_bridge_get_dst_port(br, hash, traffic_class,
-		priority, skb, NULL);
+		priority, skb, dest_addr, src_addr, NULL);
 }
 
 int hyfi_bridge_should_deliver(const struct hyfi_net_bridge_port *src,

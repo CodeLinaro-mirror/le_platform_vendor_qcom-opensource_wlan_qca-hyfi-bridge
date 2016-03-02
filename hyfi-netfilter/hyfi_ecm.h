@@ -41,9 +41,15 @@ struct hyfi_ecm_flow_data_t {
 	/* Time of the last ECM stats update (in jiffies) */
 	u_int32_t last_update;
 
-        /* Duration of the last period over which a rate was estimated
-           (in jiffies) */
+	/* Duration of the last period over which a rate was estimated
+	   (in jiffies) */
 	u_int32_t last_elapsed_time;
+
+	/* Time last ECM accel / decel command sent to hw (in jiffies) */
+	unsigned long cmd_time_begun;
+
+	/* Time last ECM accel / decel command completed by hw (in jiffies) */
+	unsigned long cmd_time_completed;
 };
 
 static inline void hyfi_ecm_set_flag(struct hyfi_ecm_flow_data_t *flow, u_int32_t flag)
