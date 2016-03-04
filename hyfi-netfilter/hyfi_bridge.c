@@ -16,6 +16,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#define DEBUG_LEVEL HYFI_NF_DEBUG_LEVEL
+
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/etherdevice.h>
@@ -101,7 +103,7 @@ int hyfi_bridge_dev_event(unsigned long event, struct net_device *dev)
 		if (!hyfi_br.dev)
 			break;
 
-		DPRINTK("Interface %s is down, ptr = %p\n", dev->name, dev);
+		DEBUG_TRACE("Interface %s is down, ptr = %p\n", dev->name, dev);
 
 		/* Free the hold of the device */
 		hyfi_bridge_deinit_bridge_device();
@@ -112,13 +114,13 @@ int hyfi_bridge_dev_event(unsigned long event, struct net_device *dev)
 			break;
 
 		if (!strcmp(dev->name, hyfi_linux_bridge)) {
-			DPRINTK("Interface %s is up, ptr = %p\n", dev->name, dev);
+			DEBUG_TRACE("Interface %s is up, ptr = %p\n", dev->name, dev);
 
 			if (dev->priv_flags != IFF_EBRIDGE) {
-				printk(KERN_ERR "hyfi-bridging: Device %s is NOT a bridge!\n", dev->name);
+				DEBUG_ERROR("hyfi-bridging: Device %s is NOT a bridge!\n", dev->name);
 			} else {
 				if (hyfi_bridge_init_bridge_device(hyfi_linux_bridge)) {
-					printk(KERN_ERR "hyfi-bridging: Failed to initialize device %s\n", dev->name);
+					DEBUG_ERROR("hyfi-bridging: Failed to initialize device %s\n", dev->name);
 					hyfi_br.dev = NULL;
 				}
 			}
@@ -165,7 +167,7 @@ int hyfi_bridge_init_port(struct net_bridge_port *p)
 	hyfi_p = kzalloc(sizeof(struct hyfi_net_bridge_port), GFP_ATOMIC);
 
 	if (!hyfi_p) {
-		printk(KERN_ERR "hyfi: Failed to allocate memory for port\n");
+		DEBUG_ERROR("hyfi: Failed to allocate memory for port\n");
 		return -1;
 	}
 
@@ -176,7 +178,7 @@ int hyfi_bridge_init_port(struct net_bridge_port *p)
 	hyfi_p->dev = p->dev;
 
 	list_add_rcu(&hyfi_p->list, &hyfi_br.port_list);
-	printk(KERN_INFO "hyfi: Added interface %s\n", p->dev->name);
+	DEBUG_INFO("hyfi: Added interface %s\n", p->dev->name);
 
 	return 0;
 }
@@ -186,7 +188,7 @@ static void hyfi_destroy_port_rcu(struct rcu_head *head)
 	struct hyfi_net_bridge_port *hyfi_p =
 			container_of(head, struct hyfi_net_bridge_port, rcu);
 
-	printk(KERN_INFO "hyfi: Removed interface %s\n", hyfi_p->dev->name);
+	DEBUG_INFO("hyfi: Removed interface %s\n", hyfi_p->dev->name);
 	kfree(hyfi_p);
 }
 
@@ -453,31 +455,30 @@ static struct net_bridge_port *hyfi_bridge_get_dst_port_no_hash(
 	hd = __hyfi_hdtbl_get(&hyfi_br, addr);
 	if (hd) {
 		if (traffic_class == HYFI_TRAFFIC_CLASS_UDP) {
-#if 0
-			printk("0x%x: Match in H-Default, sending on port %s\n", hash,
-				hd->dst_udp->dev->name);
-#endif
+			DEBUG_TRACE("%02x:%02x:%02x:%02x:%02x:%02x: Match in "
+				"H-Default (UDP), sending on port %s\n",
+				addr[0], addr[1], addr[2],
+				addr[3], addr[4], addr[5], hd->dst_udp->dev->name);
 			return hd->dst_udp;
 		} else {
-#if 0
-			printk("0x%x: Match in H-Default, sending on port %s\n", hash,
+			DEBUG_TRACE("%02x:%02x:%02x:%02x:%02x:%02x: Match in "
+				"H-Default (Other), sending on port %s\n",
+				addr[0], addr[1], addr[2],
+				addr[3], addr[4], addr[5],
 				hd->dst_other->dev->name);
-#endif
 			return hd->dst_other;
 		}
 	} else {
 		dst = os_br_fdb_get((struct net_bridge *)br, addr);
 		if (dst && !dst->is_local) {
-#if 0
-			printk("0x%x: Match in FDB, sending on port %s\n", hash,
-				dst->dst->dev->name);
-#endif
+			DEBUG_TRACE("%02x:%02x:%02x:%02x:%02x:%02x: Match in "
+				"FDB, sending on port %s\n",
+				addr[0], addr[1], addr[2],
+				addr[3], addr[4], addr[5], dst->dst->dev->name);
 			return dst->dst;
 		} else {
-#if 0
-			printk("0x%x: No match found for %x:%x:%x:%x:%x:%x\n", hash,
+			DEBUG_TRACE("%02x:%02x:%02x:%02x:%02x:%02x: No match found\n",
 				addr[0], addr[1], addr[2], addr[3], addr[4], addr[5]);
-#endif
 			return NULL;
 		}
 	}
@@ -578,8 +579,7 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 				eth_hdr(*skb)->h_dest, traffic_class, priority, seq);
 
 		if(!ha) {
-			if(printk_ratelimit())
-				printk(KERN_ERR"hyfi: Cannot create an entry for aggregated flow\n");
+			DEBUG_ERROR("hyfi: Cannot create an entry for aggregated flow\n");
 
 			return NULL;
 		}
@@ -594,7 +594,7 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 }
 
 struct net_bridge_port *hyfi_bridge_port_dev_get(struct net_device *dev,
-	struct sk_buff *skb, unsigned char *addr)
+	struct sk_buff *skb, unsigned char *addr, unsigned int ecm_serial)
 {
 	/* hybrid look up first */
 	u_int32_t flag, priority;
@@ -603,6 +603,8 @@ struct net_bridge_port *hyfi_bridge_port_dev_get(struct net_device *dev,
 	u_int16_t seq = ~0;
 	const struct net_bridge *br = netdev_priv(dev);
 	const unsigned char *dest_addr, *src_addr;
+	struct net_hatbl_entry *ha;
+	struct net_bridge_port *port = NULL;
 
 	if (unlikely(!br || !hyfi_br.dev || dev != hyfi_br.dev))
 		return NULL;
@@ -617,18 +619,16 @@ struct net_bridge_port *hyfi_bridge_port_dev_get(struct net_device *dev,
 	if (memcmp(eth_hdr(skb)->h_dest, addr, ETH_ALEN) &&
 		memcmp(eth_hdr(skb)->h_source, addr, ETH_ALEN)) {
 
-#if 0
 		dest_addr = eth_hdr(skb)->h_dest;
 		src_addr = eth_hdr(skb)->h_source;
 
-		printk("0x%x: Addr %x:%x:%x:%x:%x:%x doesn't match dest_addr "
+		DEBUG_TRACE("0x%x: Addr %x:%x:%x:%x:%x:%x doesn't match dest_addr "
 			"%x:%x:%x:%x:%x:%x or src_addr %x:%x:%x:%x:%x:%x\n", hash,
 			addr[0], addr[1], addr[2], addr[3], addr[4], addr[5],
 			dest_addr[0], dest_addr[1], dest_addr[2], dest_addr[3],
 			dest_addr[4], dest_addr[5],
 			src_addr[0], src_addr[1], src_addr[2], src_addr[3],
 			src_addr[4], src_addr[5]);
-#endif
 
 		/*
 		 * Mismatch on source and destination, but we have been given
@@ -644,32 +644,53 @@ struct net_bridge_port *hyfi_bridge_port_dev_get(struct net_device *dev,
 			return NULL;
 		dest_addr = eth_hdr(skb)->h_source;
 		src_addr = eth_hdr(skb)->h_dest;
-#if 0
-		printk("0x%x: Using reverse hash, addr %x:%x:%x:%x:%x:%x, "
+
+		DEBUG_TRACE("0x%x: Using reverse hash, "
 			"dest_addr %x:%x:%x:%x:%x:%x src_addr %x:%x:%x:%x:%x:%x\n",
 			hash,
-			addr[0], addr[1], addr[2], addr[3], addr[4], addr[5],
 			dest_addr[0], dest_addr[1], dest_addr[2], dest_addr[3],
 			dest_addr[4], dest_addr[5],
 			src_addr[0], src_addr[1], src_addr[2], src_addr[3],
 			src_addr[4], src_addr[5]);
-#endif
 	} else {
 		/* Should be using forward hash */
 		dest_addr = eth_hdr(skb)->h_dest;
 		src_addr = eth_hdr(skb)->h_source;
-#if 0
-		printk("0x%x: Using forward hash, addr %x:%x:%x:%x:%x:%x, "
+		DEBUG_TRACE("0x%x: Using forward hash, "
 			"dest_addr %x:%x:%x:%x:%x:%x src_addr %x:%x:%x:%x:%x:%x\n",
 			hash,
-			addr[0], addr[1], addr[2], addr[3], addr[4], addr[5],
 			dest_addr[0], dest_addr[1], dest_addr[2], dest_addr[3],
 			dest_addr[4], dest_addr[5],
 			src_addr[0], src_addr[1], src_addr[2], src_addr[3],
 			src_addr[4], src_addr[5]);
-#endif
 	}
 
+	/*
+	 * Try looking up via ECM serial (passed in via the cookie) first
+	 */
+	spin_lock_bh(&hyfi_br.hash_ha_lock);
+	ha = hatbl_find_ecm(&hyfi_br, hash, ecm_serial, dest_addr);
+	if (ha) {
+		/* Update priority if needed*/
+		if (ha->priority != priority) {
+			DEBUG_INFO("0x%x: Priority changed to 0x%x (from 0x%x), "
+				"dest %x:%x:%x:%x:%x:%x, serial %u\n",
+				hash, priority, ha->priority,
+				dest_addr[0], dest_addr[1], dest_addr[2], dest_addr[3],
+				dest_addr[4], dest_addr[5], ecm_serial);
+			ha->priority = priority;
+		}
+
+		port = ha->dst;
+	}
+
+	spin_unlock_bh(&hyfi_br.hash_ha_lock);
+
+	if (port) {
+		return port;
+	}
+
+	/* No H-Active match - new flow? */
 	return hyfi_bridge_get_dst_port(br, hash, traffic_class,
 		priority, skb, dest_addr, src_addr, NULL);
 }
@@ -716,7 +737,7 @@ static int hyfi_bridge_deinit_bridge_device(void)
 	dev_put(hyfi_br.dev);
 	hyfi_br.dev = NULL;
 
-	printk(KERN_INFO"hyfi: Bridge %s is now detached\n", br_dev->name);
+	DEBUG_INFO("hyfi: Bridge %s is now detached\n", br_dev->name);
 	return 0;
 }
 
@@ -757,7 +778,7 @@ static int hyfi_bridge_init_bridge_device(const char *br_name)
 	if (mc_attach(&hyfi_br)<0)
             return -1;
 
-	printk(KERN_INFO"hyfi: Bridge %s is now attached\n", br_dev->name);
+	DEBUG_INFO("hyfi: Bridge %s is now attached\n", br_dev->name);
 
 	return 0;
 }

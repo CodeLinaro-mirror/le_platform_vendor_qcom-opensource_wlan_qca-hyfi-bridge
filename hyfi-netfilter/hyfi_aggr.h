@@ -1,7 +1,7 @@
 /*
  *  QCA HyFi Packet Aggregation
  *
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -124,7 +124,7 @@ static inline u_int16_t hyfi_aggr_find_next_seq(struct net_hatbl_entry *ha)
 	u_int16_t min_seq_delta = ~0;
 	u_int16_t next_seq = ~0;
 
-	DPRINTK( "%s: Current sequence = %d, valid = %d\n",
+	DEBUG_TRACE("%s: Current sequence = %d, valid = %d\n",
 			__func__, ha->aggr_rx_entry->aggr_next_seq, ha->aggr_rx_entry->next_seq_valid);
 
 	/* Handle the gap. Find which queue has the next closest sequence number */
@@ -132,7 +132,7 @@ static inline u_int16_t hyfi_aggr_find_next_seq(struct net_hatbl_entry *ha)
 		if (ha->aggr_rx_entry->hyfi_iface_info[i].seq_valid) {
 			u_int32_t q_seq = ha->aggr_rx_entry->hyfi_iface_info[i].seq;
 
-			DPRINTK( "%s: Queue %d sequence = %d\n",
+			DEBUG_TRACE("%s: Queue %d sequence = %d\n",
 					__func__, i, ha->aggr_rx_entry->hyfi_iface_info[i].seq);
 
 			if (ha->aggr_rx_entry->aggr_next_seq

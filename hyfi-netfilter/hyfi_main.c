@@ -16,6 +16,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#define DEBUG_LEVEL HYFI_NF_DEBUG_LEVEL
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -58,7 +60,7 @@ static int __init hyfi_init(void)
 		goto out;
 	}
 
-	out: printk("QCA Hy-Fi netfilter installation: %s\n",
+	out: DEBUG_INFO("QCA Hy-Fi netfilter installation: %s\n",
 			ret ? "FAILED" : "OK");
 
 	return ret;
@@ -72,7 +74,7 @@ static void __exit hyfi_exit(void)
 	mc_exit();
 	hyfi_bridge_fini();
 
-	printk( "QCA Hy-Fi netfilter uninstalled\n" );
+	DEBUG_INFO("QCA Hy-Fi netfilter uninstalled\n");
 }
 
 module_init(hyfi_init);

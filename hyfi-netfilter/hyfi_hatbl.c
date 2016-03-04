@@ -2,7 +2,7 @@
  *  H-Active table
  *  QCA HyFi Netfilter
  *
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,6 +16,8 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+
+#define DEBUG_LEVEL HYFI_NF_DEBUG_LEVEL
 
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -324,6 +326,7 @@ struct net_hatbl_entry *hatbl_find_ecm(struct hyfi_net_bridge *br, u_int32_t has
 
 	os_hlist_for_each_entry(ha, h, &br->hash_ha[hash], hlist) {
 		if (ha->ecm_serial == ecm_serial &&
+			hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_SERIAL_VALID) &&
 			!compare_ether_addr(ha->da.addr, da)) {
 			ha->last_access = jiffies;
 			return ha;
@@ -358,6 +361,7 @@ static struct net_hatbl_entry *hatbl_create(struct hyfi_net_bridge *br,
 	ha->create_time = jiffies;
 	ha->priority = priority;
 	ha->hash = hash;
+	ha->ecm_serial = UINT_MAX;
 
 	if (static_entry) {
 		hyfi_ha_set_flag(ha, HYFI_HACTIVE_TBL_STATIC_ENTRY);
@@ -371,6 +375,62 @@ static struct net_hatbl_entry *hatbl_create(struct hyfi_net_bridge *br,
 
 	hlist_add_head_rcu(&ha->hlist, head);
 	br->ha_entry_cnt++;
+
+	return ha;
+}
+
+/**
+ * @brief Create a new H-Active entry, deleting a matching entry
+ *        if it already exists (ensuring the new entry is
+ *        unique)
+ *
+ * Note that this function should only be called if we believe a
+ * new entry should be created.  However, since no lock is held
+ * between when the H-Active entry is first checked for, and
+ * when this function is called, it's possible that due to a
+ * race condition, an entry may have been created in the
+ * intervening time.
+ *
+ * @param [in] br  Hy-Fi bridge
+ * @param [in] hash  hash for the entry
+ * @param [in] dst  destination port
+ * @param [in] sa  source MAC address
+ * @param [in] da  destination MAC address
+ * @param [in] id  next-hop MAC address
+ * @param [in] sub_class  traffic type (UDP or other)
+ * @param [in] priority  packet priority
+ * @param [in] static_entry  if new H-Active entry is static,
+ *                           set to 1
+ *
+ * @return struct net_hatbl_entry*
+ */
+static struct net_hatbl_entry *hatbl_find_before_create(struct hyfi_net_bridge *br,
+		u_int32_t hash, struct net_bridge_port *dst, const u_int8_t *sa,
+		const u_int8_t *da, const u_int8_t *id, u_int32_t sub_class,
+		u_int32_t priority, u_int32_t static_entry)
+{
+	struct hlist_head *head = &br->hash_ha[hash];
+	struct net_hatbl_entry *ha = NULL;
+
+	if (unlikely(br->ha_entry_cnt >= HYFI_HACTIVE_TBL_SIZE)) {
+		DEBUG_WARN("hyfi: Unable to add entry 0x%02x - max table size exceeded\n",
+			hash);
+		return NULL;
+	}
+
+	ha = hatbl_find_rcu(head, da, sub_class, priority);
+
+	if (unlikely(ha)) {
+		DEBUG_WARN("hyfi: H-Active entry 0x%02x exists\n", hash);
+		hatbl_delete(br, ha);
+	}
+
+	ha = hatbl_create(br, hash, dst, sa, da, id,
+		sub_class, priority, static_entry);
+
+	if (!ha) {
+		DEBUG_WARN("hyfi: Unable to create H-Active entry 0x%02x\n", hash);
+	}
 
 	return ha;
 }
@@ -415,27 +475,15 @@ struct net_hatbl_entry* hyfi_hatbl_insert(struct hyfi_net_bridge *br,
 		u_int32_t hash, u_int32_t sub_class, struct net_hdtbl_entry *hd,
 		u_int32_t priority, const u_int8_t* sa)
 {
-	struct hlist_head *head = &br->hash_ha[hash];
 	struct net_hatbl_entry *ha = NULL;
 
 	spin_lock(&br->hash_ha_lock);
-	do {
-		if (unlikely(br->ha_entry_cnt >= HYFI_HACTIVE_TBL_SIZE)) {
-			break;
-		}
-		ha = hatbl_find_rcu(head, hd->addr.addr, sub_class, priority);
-		if (unlikely(ha)) {
-			printk(KERN_WARNING "hyfi: H-Active entry 0x%02x exists\n", hash);
-			hatbl_delete(br, ha);
-		}
+	ha = hatbl_find_before_create(br, hash,
+		sub_class == HYFI_TRAFFIC_CLASS_UDP ?
+			hd->dst_udp : hd->dst_other, sa, hd->addr.addr,
+		hd->id.addr, sub_class, priority,
+		hyfi_hd_has_flag(hd, HYFI_HDTBL_STATIC_ENTRY));
 
-		ha = hatbl_create(br, hash,
-				sub_class == HYFI_TRAFFIC_CLASS_UDP ?
-						hd->dst_udp : hd->dst_other, sa, hd->addr.addr,
-				hd->id.addr, sub_class, priority,
-				hyfi_hd_has_flag(hd, HYFI_HDTBL_STATIC_ENTRY));
-
-	} while (false);
 	spin_unlock(&br->hash_ha_lock);
 
 	if (ha) {
@@ -452,18 +500,11 @@ struct net_hatbl_entry* hyfi_hatbl_insert_ecm_classifier(struct hyfi_net_bridge 
 	struct net_hatbl_entry *ha = NULL;
 
 	spin_lock_bh(&br->hash_ha_lock);
-	do {
-		if (unlikely(br->ha_entry_cnt >= HYFI_HACTIVE_TBL_SIZE)) {
-			break;
-		}
-
-		ha = hatbl_create(br, hash,
-				sub_class == HYFI_TRAFFIC_CLASS_UDP ?
-						hd->dst_udp : hd->dst_other, sa, hd->addr.addr,
-				hd->id.addr, sub_class, priority,
-				hyfi_hd_has_flag(hd, HYFI_HDTBL_STATIC_ENTRY));
-
-	} while (false);
+	ha = hatbl_find_before_create(br, hash,
+		sub_class == HYFI_TRAFFIC_CLASS_UDP ?
+			hd->dst_udp : hd->dst_other, sa, hd->addr.addr,
+		hd->id.addr, sub_class, priority,
+		hyfi_hd_has_flag(hd, HYFI_HDTBL_STATIC_ENTRY));
 
 	if (ha) {
 		ha->ecm_serial = ecm_serial;
@@ -506,7 +547,7 @@ struct net_hatbl_entry * hyfi_hatbl_create_tracked_entry(
 	ha = hatbl_create(br, hash, dst->dst, sa, da, da, sub_class, priority, 0);
 
 	if (!ha) {
-		printk(KERN_ERR"hyfi: Failed to allocate memory for entry\n");
+		DEBUG_ERROR("hyfi: Failed to allocate memory for entry\n");
 		return NULL;
 	}
 
@@ -532,14 +573,14 @@ struct net_hatbl_entry * hyfi_hatbl_create_aggr_entry(
 	ha = hatbl_create(br, hash, dst->dst, sa, da, da, sub_class, priority, 0);
 
 	if (!ha) {
-		printk(KERN_ERR"hyfi: Failed to allocate memory for entry\n");
+		DEBUG_ERROR("hyfi: Failed to allocate memory for entry\n");
 
 		spin_unlock(&br->hash_ha_lock);
 		return NULL ;
 	}
 
 	if (hyfi_aggr_init_entry(ha, seq) < 0) {
-		printk(KERN_ERR"hyfi: Failed to allocate memory for entry\n");
+		DEBUG_ERROR("hyfi: Failed to allocate memory for entry\n");
 		hatbl_delete(br, ha);
 
 		spin_unlock(&br->hash_ha_lock);
@@ -548,8 +589,7 @@ struct net_hatbl_entry * hyfi_hatbl_create_aggr_entry(
 
 	spin_unlock(&br->hash_ha_lock);
 
-	printk( KERN_INFO
-			"hyfi: Created an aggregated entry, ha = %p, hash = 0x%02x, seq = %d, num_ifs = %d\n",
+	DEBUG_INFO("hyfi: Created an aggregated entry, ha = %p, hash = 0x%02x, seq = %d, num_ifs = %d\n",
 			ha, hash, seq & 0x3fff, (seq >> 14) & 3);
 
 	return ha;
@@ -638,7 +678,7 @@ int hyfi_hatbl_update(struct hyfi_net_bridge *br, struct __hatbl_entry *hae,
 		if (if_change && br->path_switch_param.enable_switch_markers) {
 			u_int32_t i = HYFI_PSW_MSE_CNT;
 
-			DPRINTK("Sending switch end of flow x%d\n", i);
+			DEBUG_TRACE("Sending switch end of flow x%d\n", i);
 			while (i--) {
 				rcu_read_lock();
 				hyfi_psw_send_pkt(br, ha, HYFI_PSW_PKT_3, 0);
@@ -656,7 +696,7 @@ int hyfi_hatbl_update(struct hyfi_net_bridge *br, struct __hatbl_entry *hae,
 
 		if (if_change && br->path_switch_param.enable_switch_markers
 				&& !hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_AGGR_TX_ENTRY)) {
-			DPRINTK("Sending switch start of flow\n");
+			DEBUG_TRACE("Sending switch start of flow\n");
 			rcu_read_lock();
 			hyfi_psw_send_pkt(br, ha, HYFI_PSW_PKT_4, 0);
 			rcu_read_unlock();
@@ -700,23 +740,11 @@ struct net_hatbl_entry* hyfi_hatbl_insert_from_fdb(struct hyfi_net_bridge *br,
 		u_int32_t hash, struct net_bridge_port *dst, const u_int8_t *sa, const u_int8_t *da,
 		const u_int8_t *id, u_int32_t sub_class, u_int32_t priority, bool keep_lock)
 {
-	struct hlist_head *head = &br->hash_ha[hash];
 	struct net_hatbl_entry *ha = NULL;
 
 	spin_lock(&br->hash_ha_lock);
-	do {
-		if (unlikely(br->ha_entry_cnt >= HYFI_HACTIVE_TBL_SIZE)) {
-			break;
-		}
-		ha = hatbl_find_rcu(head, da, sub_class, priority);
-		if (unlikely(ha)) {
-			printk(KERN_WARNING "hyfi: H-Active entry 0x%02x exists\n", hash);
-			hatbl_delete(br, ha);
-		}
 
-		ha = hatbl_create(br, hash, dst, sa, da, id, sub_class, priority, 1);
-
-	} while (false);
+	ha = hatbl_find_before_create(br, hash, dst, sa, da, id, sub_class, priority, 1);
 
 	if (keep_lock && ha) {
 		hyfi_netlink_event_send(HYFI_EVENT_ADD_HA_ENTRY,
@@ -778,6 +806,20 @@ int __init hyfi_hatbl_init(struct hyfi_net_bridge *br)
 	hyfi_hatbl_timer_init(br);
 
 	return 0;
+}
+
+void hyfi_hatbl_mark_accelerated(struct net_hatbl_entry *ha, u_int32_t ecm_serial)
+{
+	hyfi_ha_set_flag(ha, HYFI_HACTIVE_TBL_ACCL_ENTRY);
+	hyfi_ha_set_flag(ha, HYFI_HACTIVE_TBL_SERIAL_VALID);
+	ha->ecm_serial = ecm_serial;
+}
+
+void hyfi_hatbl_mark_decelerated(struct net_hatbl_entry *ha)
+{
+	hyfi_ha_clear_flag(ha, HYFI_HACTIVE_TBL_ACCL_ENTRY);
+	hyfi_ha_clear_flag(ha, HYFI_HACTIVE_TBL_SERIAL_VALID);
+	ha->ecm_serial = UINT_MAX;
 }
 
 void hyfi_hatbl_fini(struct hyfi_net_bridge *br)

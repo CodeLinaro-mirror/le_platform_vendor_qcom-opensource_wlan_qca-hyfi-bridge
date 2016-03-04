@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,15 +22,6 @@
 #include "hyfi_netfilter.h"
 #include "hyfi_seamless.h"
 #include "hyfi_osdep.h"
-
-#define HY_BRIDGE_DEBUG
-
-#ifdef HY_BRIDGE_DEBUG
-extern u_int32_t psw_debug;
-#define DPRINTK( __fmt, ... )  do { if(unlikely(psw_debug)) printk( __fmt, ##__VA_ARGS__ ); } while(0)
-#else
-#define DPRINTK(...)
-#endif
 
 #ifndef IPPROTO_ETHERIP
 #define IPPROTO_ETHERIP (97)
@@ -135,5 +126,59 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 int hyfi_bridge_init(void);
 
 void hyfi_bridge_fini(void);
+
+/*
+ * The following are debug macros used throughout the Hy-Fi bridge.
+ * Each file that #includes this file MUST have a:
+ *
+ * #define DEBUG_LEVEL X
+ *
+ * before the inclusion of this file.
+ * X is:
+ * 0 = OFF
+ * 1 = ASSERTS / ERRORS
+ * 2 = 1 + WARN
+ * 3 = 2 + INFO
+ * 4 = 3 + TRACE
+ * NOTE: But X is usually provided by a -D preprocessor defined in the Makefile
+ */
+#if (DEBUG_LEVEL < 1)
+#define DEBUG_ASSERT(s, ...)
+#define DEBUG_ERROR(s, ...)
+#else
+#define DEBUG_ASSERT(c, s, ...) if (!(c)) { pr_emerg("ASSERT: %s:%d:" s, __FUNCTION__, __LINE__, ##__VA_ARGS__); BUG(); }
+#define DEBUG_ERROR(s, ...) pr_err("%s:%d:" s, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+#endif
+
+#if defined(CONFIG_DYNAMIC_DEBUG)
+/*
+ * Compile messages for dynamic enable/disable
+ */
+#define DEBUG_WARN(s, ...) pr_debug("%s[%d]:" s, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+#define DEBUG_INFO(s, ...) pr_debug("%s[%d]:" s, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+#define DEBUG_TRACE(s, ...) pr_debug("%s[%d]:" s, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+#else
+
+/*
+ * Statically compile messages at different levels
+ */
+#if (DEBUG_LEVEL < 2)
+#define DEBUG_WARN(s, ...)
+#else
+#define DEBUG_WARN(s, ...) pr_warn("%s[%d]:" s, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+#endif
+
+#if (DEBUG_LEVEL < 3)
+#define DEBUG_INFO(s, ...)
+#else
+#define DEBUG_INFO(s, ...) pr_notice("%s[%d]:" s, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+#endif
+
+#if (DEBUG_LEVEL < 4)
+#define DEBUG_TRACE(s, ...)
+#else
+#define DEBUG_TRACE(s, ...) pr_info("%s[%d]:" s, __FUNCTION__, __LINE__, ##__VA_ARGS__)
+#endif
+#endif
 
 #endif /* HYFI_BRIDGE_H_ */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, 2016, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,6 +13,8 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+
+#define DEBUG_LEVEL HYFI_NF_DEBUG_LEVEL
 
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
@@ -29,8 +31,6 @@
 
 static const u_int8_t field1[15] = { 0x88, 0xb7, 0x00, 0x03, 0x7f, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x20 };
-
-u_int32_t psw_debug = 0;
 
 #define TAG_80211Q_START_BYTE_POS 	12
 
@@ -77,7 +77,7 @@ static inline void hyfi_psw_read_idx(struct sk_buff *skb,
 
 	if (unlikely(pkt)) {
 		if (HYFI_IS_PSW_PKT_5( pkt )) {
-			DPRINTK( "Clearing rmv_pkts = %d, index = %d\n",
+			DEBUG_TRACE("Clearing rmv_pkts = %d, index = %d\n",
 					pha_psw_stm_entry->rmv_pkts, pha_psw_stm_entry->last_idx);
 			pha_psw_stm_entry->last_idx = ntohs(pkt->field12);
 			pha_psw_stm_entry->rmv_pkts = 0;
@@ -137,25 +137,25 @@ void hyfi_psw_param_update( struct hyfi_net_bridge *br,
         br->path_switch_param.eth_max_jiffies_diff = msecs_to_jiffies(
                 p->eth_tracking_time ); // The default pkt tracking time on PLC is 200 ms
 
-        printk(KERN_INFO "Fail-over seamless path switching: %s\n", "Enabled");
+        DEBUG_INFO("Fail-over seamless path switching: %s\n", "Enabled");
 
-        DPRINTK(KERN_DEBUG "%s[%d] wifi2.4 max qlen=%d, wifi 2.4 max jiffiesdiff=%ld\n", __func__, __LINE__,
+        DEBUG_TRACE("%s[%d] wifi2.4 max qlen=%d, wifi 2.4 max jiffiesdiff=%ld\n", __func__, __LINE__,
             br->path_switch_param.wifi_2_q_max_len, br->path_switch_param.wifi_2_max_jiffies_diff);
 
-        DPRINTK(KERN_DEBUG "%s[%d] wifi5 max qlen=%d, wifi5 max jiffiesdiff=%ld\n", __func__, __LINE__,
+        DEBUG_TRACE("%s[%d] wifi5 max qlen=%d, wifi5 max jiffiesdiff=%ld\n", __func__, __LINE__,
             br->path_switch_param.wifi_5_q_max_len, br->path_switch_param.wifi_5_max_jiffies_diff);
 
-        DPRINTK(KERN_DEBUG "%s[%d] plc max qlen=%d, plc max jiffiesdiff=%ld\n", __func__, __LINE__,
+        DEBUG_TRACE("%s[%d] plc max qlen=%d, plc max jiffiesdiff=%ld\n", __func__, __LINE__,
             br->path_switch_param.plc_q_max_len, br->path_switch_param.plc_max_jiffies_diff);
 
-        DPRINTK(KERN_DEBUG "%s[%d] eth max qlen =%d, eth max jiffiesdiff=%ld\n", __func__, __LINE__,
+        DEBUG_TRACE("%s[%d] eth max qlen =%d, eth max jiffiesdiff=%ld\n", __func__, __LINE__,
             br->path_switch_param.eth_q_max_len, br->path_switch_param.eth_max_jiffies_diff);
     }
     else {
-    	printk(KERN_INFO "Fail-over seamless path switching: %s\n", "Disabled");
+    	DEBUG_INFO("Fail-over seamless path switching: %s\n", "Disabled");
     }
 
-    printk(KERN_INFO "Load-balancing seamless path switching: %s\n",
+    DEBUG_INFO("Load-balancing seamless path switching: %s\n",
     		br->path_switch_param.enable_switch_markers ? "Enabled" : "Disabled");
 }
 
@@ -170,27 +170,22 @@ void hyfi_psw_adv_param_update(struct hyfi_net_bridge *br, u_int32_t param,
 	switch (param) {
 	case HYFI_SET_PSW_MSE_TIMEOUT:
 		br->path_switch_param.mse_timeout_val = msecs_to_jiffies(*new_val);
-		printk(KERN_INFO "Switch end timeout value: %dms\n", jiffies_to_msecs(br->path_switch_param.mse_timeout_val));
-		break;
-
-	case HYFI_SET_PSW_DEBUG:
-		psw_debug = *new_val;
-		printk(KERN_INFO "Path switching debug level: %d\n", psw_debug);
+		DEBUG_INFO("Switch end timeout value: %dms\n", jiffies_to_msecs(br->path_switch_param.mse_timeout_val));
 		break;
 
 	case HYFI_SET_PSW_DROP_MARKERS:
 		br->path_switch_param.drop_markers = *new_val;
-		printk(KERN_INFO "Drop markers: %s\n", br->path_switch_param.drop_markers ? "Yes" : "No");
+		DEBUG_INFO("Drop markers: %s\n", br->path_switch_param.drop_markers ? "Yes" : "No");
 		break;
 
 	case HYFI_SET_PSW_OLD_IF_QUIET_TIME:
 		br->path_switch_param.old_if_quiet_timeout = msecs_to_jiffies(*new_val);
-		printk(KERN_INFO "Old interface quiet time to declare timeout = %dms\n", jiffies_to_msecs(br->path_switch_param.old_if_quiet_timeout));
+		DEBUG_INFO("Old interface quiet time to declare timeout = %dms\n", jiffies_to_msecs(br->path_switch_param.old_if_quiet_timeout));
 		break;
 
 	case HYFI_SET_PSW_DUP_PKT_FLUSH_QUOTA:
 		br->path_switch_param.dup_buf_flush_quota = *new_val;
-		printk(KERN_INFO "Duplicate buffer flush quota = %d packets\n", br->path_switch_param.dup_buf_flush_quota);
+		DEBUG_INFO("Duplicate buffer flush quota = %d packets\n", br->path_switch_param.dup_buf_flush_quota);
 		break;
 
 	default:
@@ -359,7 +354,7 @@ void hyfi_psw_pkt_track(struct sk_buff *skb, struct net_hatbl_entry *ha,
 		hyfi_skb_track->hyfi_pkt_path = pkt_path;
 		TAILQ_INSERT_TAIL( skb_track_q, hyfi_skb_track, skb_track_qelem);
 	} else {
-		DPRINTK(KERN_WARNING "%s Invalid buffered port %d\n",
+		DEBUG_WARN("%s Invalid buffered port %d\n",
 				__func__, pha_psw_stm_entry->buffered_port_type);
 	}
 
@@ -376,8 +371,7 @@ void path_switch_handle(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
 	pha_psw_stm_entry = &ha->psw_stm_entry;
 	skb_track_q = &pha_psw_stm_entry->skb_track_q;
 
-	DPRINTK(
-			"%s: Global tracking: %d, Flow: 0x%x port: %d, enable: %d, use: %d\n",
+	DEBUG_TRACE("%s: Global tracking: %d, Flow: 0x%x port: %d, enable: %d, use: %d\n",
 			__func__, br->path_switch_param.enable_path_switch, ha->hash, pha_psw_stm_entry->buffered_port_type, hae->psw_enable, hae->psw_use);
 
 	if (br->path_switch_param.enable_path_switch && hae->psw_enable) {
@@ -410,8 +404,7 @@ void path_switch_handle(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
 			&& (pha_psw_stm_entry->buffered_port_type
 					!= hyfi_portgrp_num(hyfi_bridge_get_port(dst)))) {
 
-		DPRINTK(
-				"%s: Switching flow 0x%2x from port %d to port %d, duplicate packets: %d\n",
+		DEBUG_TRACE("%s: Switching flow 0x%2x from port %d to port %d, duplicate packets: %d\n",
 				__func__, ha->hash, pha_psw_stm_entry->buffered_port_type,
 				hyfi_portgrp_num(hyfi_bridge_get_port(dst)), pha_psw_stm_entry->q_len);
 
@@ -448,7 +441,7 @@ void path_switch_handle(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
 			rcu_read_unlock();
 		}
 	} else {
-		DPRINTK( "%s: Freeing %d duplicate packets from flow 0x%2x\n",
+		DEBUG_TRACE("%s: Freeing %d duplicate packets from flow 0x%2x\n",
 				__func__, pha_psw_stm_entry->q_len, ha->hash);
 
 		spin_lock_bh(&pha_psw_stm_entry->track_q_lock);
@@ -492,7 +485,7 @@ void hyfi_psw_flush_track_q(struct ha_psw_stm_entry *pha_psw_stm_entry)
 
 	pha_psw_stm_entry->q_len = 0;
 	spin_unlock_bh(&pha_psw_stm_entry->track_q_lock);
-	DPRINTK(KERN_WARNING "%s[%d] flushed packet=%d\n",
+	DEBUG_WARN("%s[%d] flushed packet=%d\n",
 			__func__, __LINE__, flush_pkt_cnt);
 }
 
@@ -515,7 +508,7 @@ void hyfi_psw_send_pkt(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
 
 	skb = alloc_skb(ETH_FRAME_LEN + 50, GFP_ATOMIC );
 	if (skb == NULL ) {
-		printk(KERN_ERR "%s[%d] alloc skb fail\n", __func__, __LINE__);
+		DEBUG_ERROR("%s[%d] alloc skb fail\n", __func__, __LINE__);
 		return;
 	}
 
@@ -726,19 +719,18 @@ static int hyfi_psw_handle_pkt1(struct psw_pkt *psw_pkt,
 	if (!ha)
 		return 0;
 
-	DPRINTK( "Buffer begin marker packet: packets: %d, last index = %d\n",
+	DEBUG_TRACE("Buffer begin marker packet: packets: %d, last index = %d\n",
 			freed_pkt, last_idx);
 
 	spin_lock(&ha->psw_info.buf_q_lock);
 
 	if (ha->psw_info.dup_pkt || ha->psw_info.wait_idx >= 0) {
 		spin_unlock(&ha->psw_info.buf_q_lock);
-		DPRINTK( "Duplicate buffer begin marker detected!\n");
+		DEBUG_TRACE("Duplicate buffer begin marker detected!\n");
 		return 0;
 	}
 
-	DPRINTK(
-			"It=%d, Ir=%d, ha->psw_info.pkt_cnt = %d, freed_pkt = %d, ha->psw_info.wait_idx = %d\n",
+	DEBUG_TRACE("It=%d, Ir=%d, ha->psw_info.pkt_cnt = %d, freed_pkt = %d, ha->psw_info.wait_idx = %d\n",
 			last_idx, ha->psw_info.last_idx, ha->psw_info.pkt_cnt, freed_pkt, ha->psw_info.wait_idx);
 
 	ha->psw_info.mse_rcv = ha->psw_info.msb_rcv = 0;
@@ -747,8 +739,7 @@ static int hyfi_psw_handle_pkt1(struct psw_pkt *psw_pkt,
 		if (freed_pkt < ha->psw_info.pkt_cnt) {
 			ha->psw_info.dup_pkt = ha->psw_info.pkt_cnt - freed_pkt;
 			ha->psw_info.wait_idx = -1;
-			DPRINTK(
-					"It==Ir, ha=%p, ha->psw_info.dup_pkt = %d, ha->psw_info.pkt_cnt = %d, freed_pkt = %d\n",
+			DEBUG_TRACE("It==Ir, ha=%p, ha->psw_info.dup_pkt = %d, ha->psw_info.pkt_cnt = %d, freed_pkt = %d\n",
 					ha, ha->psw_info.dup_pkt, ha->psw_info.pkt_cnt, freed_pkt);
 		}
 	} else {
@@ -757,8 +748,7 @@ static int hyfi_psw_handle_pkt1(struct psw_pkt *psw_pkt,
 		if (d < (1 << 8)) {
 			ha->psw_info.wait_idx = ha->psw_info.last_idx;
 			ha->psw_info.dup_pkt = ha->psw_info.pkt_cnt;
-			DPRINTK(
-					"It<Ir, ha=%p, It=%d, Ir=%d, ha->psw_info.dup_pkt = %d, ha->psw_info.pkt_cnt = %d, freed_pkt = %d, ha->psw_info.wait_idx = %d\n",
+			DEBUG_TRACE("It<Ir, ha=%p, It=%d, Ir=%d, ha->psw_info.dup_pkt = %d, ha->psw_info.pkt_cnt = %d, freed_pkt = %d, ha->psw_info.wait_idx = %d\n",
 					ha, last_idx, ha->psw_info.last_idx, ha->psw_info.dup_pkt, ha->psw_info.pkt_cnt, freed_pkt, ha->psw_info.wait_idx);
 		}
 	}
@@ -792,7 +782,7 @@ static int hyfi_psw_handle_pkt2(struct psw_pkt *psw_pkt,
 	if (!ha)
 		return 0;
 
-	DPRINTK("Buffer end marker packet\n");
+	DEBUG_TRACE("Buffer end marker packet\n");
 
 	spin_lock(&ha->psw_info.buf_q_lock);
 
@@ -837,15 +827,14 @@ static int hyfi_psw_handle_pkt3(struct psw_pkt *psw_pkt,
 	ha->psw_info.mbb_dev_idx = 0;
 	if (ha->psw_info.msb_rcv && ha->psw_info.last_mrk_id == mrk_id) {
 		if (!ha->psw_info.mse_timeout) {
-			DPRINTK(
-					"Switch end of stream marker %d detected AFTER switch begin (Delta=%ums), forwarding %d buffered packets, buffered ifindex %d\n",
+			DEBUG_TRACE("Switch end of stream marker %d detected AFTER switch begin (Delta=%ums), forwarding %d buffered packets, buffered ifindex %d\n",
 					mrk_id, jiffies_to_msecs(jiffies - ha->psw_info.old_if_jiffies), ha->psw_info.buf_pkt, ha->psw_info.buf_dev_idx);
 
 			ha->psw_info.msb_rcv = 0;
 			ha->psw_info.mse_rcv = 0;
 			ha->psw_info.old_if_jiffies = 0;
 		} else {
-			DPRINTK("Ignoring Switch end of stream marker %d after timeout\n",
+			DEBUG_TRACE("Ignoring Switch end of stream marker %d after timeout\n",
 					mrk_id);
 		}
 	} else {
@@ -853,15 +842,14 @@ static int hyfi_psw_handle_pkt3(struct psw_pkt *psw_pkt,
 			ha->psw_info.last_mrk_id = mrk_id;
 
 			if (!(ha->psw_info.dup_pkt || ha->psw_info.wait_idx >= 0)) {
-				DPRINTK( "Switch end of stream marker %d detected\n", mrk_id);
+				DEBUG_TRACE("Switch end of stream marker %d detected\n", mrk_id);
 				ha->psw_info.mse_rcv = 1;
 				ha->psw_info.mse_timeout = 0;
 			} else {
-				DPRINTK(
-						"Switch end of stream marker during buffer - ignore\n");
+				DEBUG_TRACE("Switch end of stream marker during buffer - ignore\n");
 			}
 		} else {
-			DPRINTK( "Ignoring Switch end of stream marker %d detected\n",
+			DEBUG_TRACE("Ignoring Switch end of stream marker %d detected\n",
 					mrk_id);
 		}
 	}
@@ -904,8 +892,7 @@ static int hyfi_psw_handle_pkt4(struct psw_pkt *psw_pkt,
 
 	ha->psw_info.last_jiffies = jiffies;
 	if (ha->psw_info.mse_rcv && ha->psw_info.last_mrk_id == mrk_id) {
-		DPRINTK(
-				"Switch beginning of stream marker %d detected after switch end - No buffering\n",
+		DEBUG_TRACE("Switch beginning of stream marker %d detected after switch end - No buffering\n",
 				mrk_id);
 		ha->psw_info.mse_rcv = 0;
 		ha->psw_info.msb_rcv = 0;
@@ -915,8 +902,7 @@ static int hyfi_psw_handle_pkt4(struct psw_pkt *psw_pkt,
 	} else {
 		ha->psw_info.last_mrk_id = mrk_id;
 		if (!(ha->psw_info.dup_pkt || ha->psw_info.wait_idx >= 0)) {
-			DPRINTK(
-					"Switch beginning of stream marker %d detected BEFORE switch end - Starting to buffer from ifindex %d\n",
+			DEBUG_TRACE("Switch beginning of stream marker %d detected BEFORE switch end - Starting to buffer from ifindex %d\n",
 					mrk_id, pskb->dev->ifindex);
 			ha->psw_info.msb_rcv = 1;
 			ha->psw_info.buf_dev_idx = pskb->dev->ifindex;
@@ -924,7 +910,7 @@ static int hyfi_psw_handle_pkt4(struct psw_pkt *psw_pkt,
 			ha->psw_info.mse_timeout = 0;
 			ha->psw_info.old_if_jiffies = jiffies;
 		} else {
-			DPRINTK( "Switch begin of stream marker during buffer - ignore\n");
+			DEBUG_TRACE("Switch begin of stream marker during buffer - ignore\n");
 			ha->psw_info.msb_rcv = 0;
 		}
 	}
@@ -970,7 +956,7 @@ static int hyfi_psw_handle_pkt5(struct psw_pkt *psw_pkt,
 		return 0;
 	}
 
-	DPRINTK( "Marker packet: counted %d packets, index = %d\n",
+	DEBUG_TRACE("Marker packet: counted %d packets, index = %d\n",
 			ha->psw_info.pkt_cnt, last_idx);
 	ha->psw_info.pkt_cnt = 0;
 	ha->psw_info.last_idx = last_idx;
@@ -1016,10 +1002,8 @@ int hyfi_psw_process_pkt(struct net_hatbl_entry *ha, struct sk_buff **skb,
 		kfree_skb(pskb);
 		*skb = NULL;
 
-		if (printk_ratelimit()) {
-			DPRINTK("Dropping packet from old interface %d\n",
-					pskb->dev->ifindex);
-		}
+		DEBUG_TRACE("Dropping packet from old interface %d\n",
+			pskb->dev->ifindex);
 
 		spin_unlock(&ha->psw_info.buf_q_lock);
 		return 1;
@@ -1047,8 +1031,7 @@ int hyfi_psw_process_pkt(struct net_hatbl_entry *ha, struct sk_buff **skb,
 				}
 
 				if (time_after( jiffies, ha->psw_info.old_if_jiffies + br->path_switch_param.old_if_quiet_timeout )) {
-					DPRINTK(
-							"Timeout waiting for switch end, old medium appears to be dead (jiffies=%lu, old_if_jiffies=%lu, timeout=%ums), forwarding %d buffered packets\n",
+					DEBUG_TRACE("Timeout waiting for switch end, old medium appears to be dead (jiffies=%lu, old_if_jiffies=%lu, timeout=%ums), forwarding %d buffered packets\n",
 							jiffies, ha->psw_info.old_if_jiffies, jiffies_to_msecs(br->path_switch_param.old_if_quiet_timeout), ha->psw_info.buf_pkt);
 					ha->psw_info.mse_timeout = 1;
 					ha->psw_info.old_if_jiffies = 0;
@@ -1058,8 +1041,7 @@ int hyfi_psw_process_pkt(struct net_hatbl_entry *ha, struct sk_buff **skb,
 				return 1;
 			} else {
 				if (!ha->psw_info.mse_timeout) {
-					DPRINTK(
-							"Timeout waiting for switch end (jiffies=%lu, last_jiffies=%lu, timeout=%ums), forwarding %d buffered packets\n",
+					DEBUG_TRACE("Timeout waiting for switch end (jiffies=%lu, last_jiffies=%lu, timeout=%ums), forwarding %d buffered packets\n",
 							jiffies, ha->psw_info.last_jiffies, jiffies_to_msecs(br->path_switch_param.mse_timeout_val), ha->psw_info.buf_pkt);
 					ha->psw_info.mse_timeout = 1;
 

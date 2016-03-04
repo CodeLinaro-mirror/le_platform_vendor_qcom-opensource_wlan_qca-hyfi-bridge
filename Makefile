@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (c) 2012, The Linux Foundation. All rights reserved.
+# Copyright (c) 2012, 2014, 2016 The Linux Foundation. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License version 2 as published by 
@@ -39,6 +39,13 @@ EXTRA_CFLAGS += -Werror -Wall -g
 ifeq ($(strip ${HYBRID_MC_MLD}),1)
 ccflags-y+=-DHYBRID_MC_MLD
 endif
+
+# #############################################################################
+# Debug flags, set these to = 0 if you want to disable all debugging.
+# By turning off debugs you gain maximum performance.
+# #############################################################################
+ccflags-y += -DHYFI_NF_DEBUG_LEVEL=1
+ccflags-y += -DHYFI_MC_DEBUG_LEVEL=1
 
 # Kernel module compilation - part 2
 ifneq ($(KERNELRELEASE),)

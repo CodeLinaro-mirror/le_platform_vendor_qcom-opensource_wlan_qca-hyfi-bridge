@@ -1,7 +1,7 @@
 /*
  *  QCA HyFi Packet Aggregation
  *
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -15,6 +15,8 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+
+#define DEBUG_LEVEL HYFI_NF_DEBUG_LEVEL
 
 #include "hyfi_aggr.h"
 
@@ -53,8 +55,9 @@ static struct net_bridge_port *hyfi_aggr_dequeue_pkts(
 					*skb = hyfi_aggr_skb_buffer->skb;
 
 #ifdef HYFI_AGGR_NOISY_DEBUG /* Be careful, noisy and damages high rate flows */
-					DPRINTK( "%s: iface = %s, seq = %d\n", __func__, (*skb)->dev->name, hyfi_aggr_skb_buffer->pkt_seq );
+					DEBUG_TRACE("%s: iface = %s, seq = %d\n", __func__, (*skb)->dev->name, hyfi_aggr_skb_buffer->pkt_seq);
 #endif
+
 					ha->aggr_rx_entry->hyfi_iface_info[i].pkt_cnt--;
 
 					hyfi_aggr_skb_buffer = TAILQ_FIRST( skb_aggr_q );
@@ -195,10 +198,9 @@ static int hyfi_aggr_queue_pkt(struct net_hatbl_entry *ha, struct sk_buff **skb,
 				(struct hyfi_aggr_skb_buffer *) (*skb)->head;
 
 #ifdef HYFI_AGGR_NOISY_DEBUG /* Be careful, noisy and damages high rate flows */
-		DPRINTK( "%s: Queue future packet, ha = %p, iface = %s, seq = %d, next_seq = %d\n",
-				__func__, ha, (*skb)->dev->name, (seq & 0x3FFF), ha->aggr_rx_entry->aggr_next_seq );
+		DEBUG_TRACE("%s: Queue future packet, ha = %p, iface = %s, seq = %d, next_seq = %d\n",
+				__func__, ha, (*skb)->dev->name, (seq & 0x3FFF), ha->aggr_rx_entry->aggr_next_seq);
 #endif
-
 		/* Push the skb in the queue */
 		skb_aggr_q = &ha->aggr_rx_entry->hyfi_iface_info[idx].skb_aggr_q;
 		hyfi_aggr_skb_buffer->pkt_seq = (seq & 0x3FFF);
@@ -224,7 +226,7 @@ static int hyfi_aggr_queue_pkt(struct net_hatbl_entry *ha, struct sk_buff **skb,
 					> HYFI_AGGR_MAX_QUEUE_LEN)) {
 		u_int16_t next_seq;
 
-		DPRINTK( "%s: Queue %d is full, flush and recover\n", __func__, idx);
+		DEBUG_TRACE("%s: Queue %d is full, flush and recover\n", __func__, idx);
 
 		hyfi_aggr_reset_queues(ha, seq);
 
@@ -238,11 +240,10 @@ static int hyfi_aggr_queue_pkt(struct net_hatbl_entry *ha, struct sk_buff **skb,
 			 * sequence number we have in the queues.
 			 */
 			ha->aggr_rx_entry->aggr_next_seq = next_seq;
-			DPRINTK( "%s: Next sequence to dequeue: %d\n", __func__, next_seq);
+			DEBUG_TRACE("%s: Next sequence to dequeue: %d\n", __func__, next_seq);
 		} else {
 			ha->aggr_rx_entry->next_seq_valid = 0;
-			DPRINTK(
-					"%s: Next sequence is unavailable, forward current packet\n",
+			DEBUG_TRACE("%s: Next sequence is unavailable, forward current packet\n",
 					__func__);
 			return -1;
 		}
@@ -265,7 +266,7 @@ struct net_bridge_port *hyfi_aggr_process_pkt(struct net_hatbl_entry *ha,
 			ha->aggr_rx_entry->time_stamp = jiffies;
 			ha->aggr_rx_entry->aggr_new_flow = 0;
 #ifdef HYFI_AGGR_NOISY_DEBUG /* Be careful, noisy and damages high rate flows */
-			DPRINTK( "%s: pkt OK, seq = %d, iface = %s\n", __func__, seq & 0x3fff, (*skb)->dev->name );
+			DEBUG_TRACE("%s: pkt OK, seq = %d, iface = %s\n", __func__, seq & 0x3fff, (*skb)->dev->name);
 #endif
 			spin_unlock(&ha->aggr_lock);
 			return ha->dst;
@@ -273,8 +274,10 @@ struct net_bridge_port *hyfi_aggr_process_pkt(struct net_hatbl_entry *ha,
 				(ha->aggr_rx_entry->aggr_next_seq > (seq & 0x3FFF))
 						&& ((ha->aggr_rx_entry->aggr_next_seq - (seq & 0x3FFF))
 								< (1 << 13)))) {
+
 #ifdef HYFI_AGGR_NOISY_DEBUG /* Be careful, noisy and damages high rate flows */
-			DPRINTK( "%s: drop old packet, seq = %d, next_seq = %d\n", __func__, (seq & 0x3FFF), ha->aggr_rx_entry->aggr_next_seq );
+			DEBUG_TRACE("%s: drop old packet, seq = %d, next_seq = %d\n",
+					__func__, (seq & 0x3FFF), ha->aggr_rx_entry->aggr_next_seq);
 #endif
 			/* This is an expired sequence, drop (TBD: option to forward) */
 			kfree_skb(*skb);
@@ -315,12 +318,12 @@ struct net_bridge_port *hyfi_aggr_process_pkt(struct net_hatbl_entry *ha,
 				 */
 				ha->aggr_rx_entry->aggr_next_seq = next_seq;
 #ifdef HYFI_AGGR_NOISY_DEBUG /* Be careful, noisy and damages high rate flows */
-				DPRINTK( "%s: Next sequence to dequeue: %d\n", __func__, next_seq );
+				DEBUG_TRACE("%s: Next sequence to dequeue: %d\n", __func__, next_seq);
 #endif
 			} else {
 				ha->aggr_rx_entry->next_seq_valid = 0;
 #ifdef HYFI_AGGR_NOISY_DEBUG /* Be careful, noisy and damages high rate flows */
-				DPRINTK( "%s: Next sequence is unavailable, forward next incoming packet\n", __func__);
+				DEBUG_TRACE("%s: Next sequence is unavailable, forward next incoming packet\n", __func__);
 #endif
 			}
 		}
@@ -333,7 +336,7 @@ struct net_bridge_port *hyfi_aggr_process_pkt(struct net_hatbl_entry *ha,
 		spin_unlock(&ha->aggr_lock);
 		return (struct net_bridge_port *) -1;
 	} else {
-		DPRINTK( "%s: new entry, seq = %d\n", __func__, seq & 0x3fff);
+		DEBUG_TRACE("%s: new entry, seq = %d\n", __func__, seq & 0x3fff);
 
 		/* Init a new entry */
 		ha->aggr_rx_entry->next_seq_valid = 1;
@@ -352,7 +355,7 @@ int hyfi_aggr_end(struct net_hatbl_entry *ha)
 	u_int32_t i;
 	void *ptr;
 
-	printk(KERN_INFO"hyfi: Cleaning up aggregated flow 0x%02x\n", ha->hash );
+	DEBUG_INFO("hyfi: Cleaning up aggregated flow 0x%02x\n", ha->hash);
 
     	spin_lock(&ha->aggr_lock);
 
@@ -474,8 +477,8 @@ int hyfi_aggr_init_entry(struct net_hatbl_entry *ha, u_int16_t seq)
 
 	spin_unlock(&ha->aggr_lock);
 
-	printk( KERN_INFO"hyfi: Detected an aggregated flow 0x%02x, splitted to %d interfaces\n",
-			ha->hash, ha->aggr_rx_entry->num_ifs );
+	DEBUG_INFO("hyfi: Detected an aggregated flow 0x%02x, splitted to %d interfaces\n",
+			ha->hash, ha->aggr_rx_entry->num_ifs);
 
 	return 0;
 }
@@ -508,7 +511,7 @@ int hyfi_aggr_update_flow(struct hyfi_net_bridge *br, struct __hatbl_entry *hae,
 
 	/* First case: stop aggregation */
 	if (!hae->aggr_entry || !update) {
-		printk("hyfi: Terminating aggregated flow 0x%02x\n", ha->hash);
+		DEBUG_TRACE("hyfi: Terminating aggregated flow 0x%02x\n", ha->hash);
 
 		/* Clear all interfaces */
 		for (i = 0; i < HYFI_AGGR_MAX_IFACE; i++) {
@@ -531,7 +534,7 @@ int hyfi_aggr_update_flow(struct hyfi_net_bridge *br, struct __hatbl_entry *hae,
 		return 0;
 	}
 
-	printk("hyfi: Updating aggregated flow 0x%02x\n", ha->hash);
+	DEBUG_TRACE("hyfi: Updating aggregated flow 0x%02x\n", ha->hash);
 
 	if (br->path_switch_param.enable_path_switch
 			&& hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_SEAMLESS_ENABLED)) {
@@ -577,7 +580,7 @@ int hyfi_aggr_update_flow(struct hyfi_net_bridge *br, struct __hatbl_entry *hae,
 				num_ifs++;
 				ha->iface_info[j].packet_quota = hae->port_list[i].quota;
 
-				printk("hyfi: Updating %s quota to %d packets\n",
+				DEBUG_TRACE("hyfi: Updating %s quota to %d packets\n",
 						ha->iface_info[j].dst->dev->name,
 						ha->iface_info[j].packet_quota);
 
@@ -624,9 +627,9 @@ int hyfi_aggr_new_flow(struct hyfi_net_bridge *br, struct __hatbl_entry *hae,
 	u_int32_t i, j = 0, aggr_port_idx = HYFI_AGGR_MAX_IFACE;
 	struct net_device *dev = NULL;
 
-	printk( KERN_INFO"hyfi: Creating a new aggregated flow 0x%02x\n", ha->hash );
+	DEBUG_INFO("hyfi: Creating a new aggregated flow 0x%02x\n", ha->hash);
 
-    	spin_lock_bh(&ha->aggr_lock);
+	spin_lock_bh(&ha->aggr_lock);
 	hyfi_ha_set_flag(ha, HYFI_HACTIVE_TBL_AGGR_TX_ENTRY);
 
 	if (br->path_switch_param.enable_path_switch
@@ -657,7 +660,7 @@ int hyfi_aggr_new_flow(struct hyfi_net_bridge *br, struct __hatbl_entry *hae,
 			ha->iface_info[j].packet_quota = hae->port_list[i].quota;
 			ha->iface_info[j].packet_count = hae->port_list[i].quota;
 
-			printk( KERN_INFO"hyfi: Adding interface %s, quota %d\n", dev->name, ha->iface_info[ j ].packet_quota );
+			DEBUG_INFO("hyfi: Adding interface %s, quota %d\n", dev->name, ha->iface_info[ j ].packet_quota);
 
 			if (ha->dst->dev == dev) {
 				/* Start aggregation on the current interface */

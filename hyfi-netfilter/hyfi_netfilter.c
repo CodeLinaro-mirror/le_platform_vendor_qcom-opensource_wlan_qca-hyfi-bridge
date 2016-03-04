@@ -16,6 +16,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#define DEBUG_LEVEL HYFI_NF_DEBUG_LEVEL
+
 #include <linux/kernel.h>
 #include <linux/netfilter.h>
 #include <linux/etherdevice.h>

@@ -2,7 +2,7 @@
  *  Hy-Fi Netlink
  *  QCA HyFi Netfilter
  *
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,6 +16,8 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+
+#define DEBUG_LEVEL HYFI_NF_DEBUG_LEVEL
 
 #include <linux/kernel.h>
 #include <net/net_namespace.h>
@@ -55,16 +57,15 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 		hymsghdr->status = HYFI_STATUS_SUCCESS;
 		hymsgdata = HYFI_MSG_DATA(nlh);
 		msgtype = nlh->nlmsg_type;
-		//printk("recv skb from user space pid:%d seq:%d, type: 0x%03x\n",pid,seq,nlh->nlmsg_type);
 
 		do {
 			if (msgtype == HYFI_ATTACH_BRIDGE) {
 				if (br) {
-					printk("hyfi: Already attached to bridge %s\n",
+					DEBUG_INFO("hyfi: Already attached to bridge %s\n",
 							br->dev->name);
 				} else {
 					if (hyfi_bridge_set_bridge_name(hymsghdr->if_name)) {
-					        printk("hyfi: failed to attach bridge %s\n",hymsghdr->if_name);
+					        DEBUG_ERROR("hyfi: failed to attach bridge %s\n",hymsghdr->if_name);
 						hymsghdr->status = HYFI_STATUS_FAILURE;
 					}
 				}
@@ -73,7 +74,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 
 			if (msgtype == HYFI_DETACH_BRIDGE) {
 				if (!br || strcmp(br->dev->name, hymsghdr->if_name)) {
-					printk("hyfi: Not attached to bridge %s\n",
+					DEBUG_ERROR("hyfi: Not attached to bridge %s\n",
 							hymsghdr->if_name);
 					hymsghdr->status = HYFI_STATUS_FAILURE;
 				} else {
@@ -102,7 +103,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 			brdev = dev_get_by_name(&init_net, hymsghdr->if_name);
 			if (!brdev || !br || brdev != br->dev) {
 				if (!(msgtype == HYFI_GET_FDB && brdev && (brdev->priv_flags & IFF_EBRIDGE))) {
-					printk("Not a Hy-Fi device, or device not found: %s\n",
+					DEBUG_ERROR("Not a Hy-Fi device, or device not found: %s\n",
 							hymsghdr->if_name);
 					hymsghdr->status = HYFI_STATUS_NOT_FOUND;
 					if (brdev)
@@ -268,7 +269,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				spin_lock_bh(&br->lock);
 				br->event_pid = p->event_pid;
 				spin_unlock_bh(&br->lock);
-				printk("hyfi: Initialized event process id %d\n", p->event_pid);
+				DEBUG_INFO("hyfi: Initialized event process id %d\n", p->event_pid);
 				break;
 			}
 
@@ -431,7 +432,6 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 			}
 
 			case HYFI_SET_PSW_MSE_TIMEOUT:
-			case HYFI_SET_PSW_DEBUG:
 			case HYFI_SET_PSW_DROP_MARKERS:
 			case HYFI_SET_PSW_OLD_IF_QUIET_TIME:
 			case HYFI_SET_PSW_DUP_PKT_FLUSH_QUOTA: {
@@ -443,7 +443,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				break;
 
 			default:
-				printk("hyfi: Unknown message type 0x%x\n", msgtype);
+				DEBUG_WARN("hyfi: Unknown message type 0x%x\n", msgtype);
 				hymsghdr->status = HYFI_STATUS_INVALID_PARAMETER;
 				break;
 
@@ -482,12 +482,12 @@ void hyfi_netlink_event_send(u32 event_type, u32 event_len, void *event_data)
 
 	skb = nlmsg_new(event_len, gfp_any());
 	if (skb == NULL) {
-		printk(KERN_ERR "hyfi: skb == NULL event_type=%d\n", event_type);
+		DEBUG_TRACE("hyfi: skb == NULL event_type=%d\n", event_type);
 		return;
 	}
 	nlh = nlmsg_put(skb, br->event_pid, 0, event_type, event_len, 0);
 	if (nlh == NULL) {
-		printk(KERN_ERR "hyfi: nlh == NULL event_type=%d\n", event_type);
+		DEBUG_ERROR("hyfi: nlh == NULL event_type=%d\n", event_type);
 		return;
 	}
 
@@ -529,7 +529,7 @@ void hyfi_netlink_event_send(u32 event_type, u32 event_len, void *event_data)
 		break;
 
 	default:
-		printk("hyfi: event type %d is not supported\n", event_type);
+		DEBUG_WARN("hyfi: event type %d is not supported\n", event_type);
 		send_msg = false;
 		break;
 	}
@@ -568,7 +568,7 @@ int __init hyfi_netlink_init( void )
 
 	if (hyfi_nl_sk == NULL)
 	{
-		printk( "hyfi: Failed to create netlink socket\n" );
+		DEBUG_ERROR("hyfi: Failed to create netlink socket\n" );
 		return -ENODEV;
 	}
 
@@ -592,7 +592,7 @@ int __init hyfi_netlink_init( void )
 	if (hyfi_nl_event_sk == NULL)
 	{
 		sock_release(hyfi_nl_sk->sk_socket);
-		printk( "hyfi: Failed to create netlink socket\n" );
+		DEBUG_ERROR("hyfi: Failed to create netlink socket\n" );
 		return -ENODEV;
 	}
 

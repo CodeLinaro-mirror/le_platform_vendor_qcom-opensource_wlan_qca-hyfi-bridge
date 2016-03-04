@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014, 2016 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -107,8 +107,7 @@ enum {
 	HYFI_SET_PATHSWITCH_PARAM = 0x500,
 
 	HYFI_PSW_FIRST = 0x600, /* Advanced path switching range 0x200 - 0x300 */
-	HYFI_SET_PSW_DEBUG = HYFI_PSW_FIRST,
-	HYFI_SET_PSW_MSE_TIMEOUT,
+	HYFI_SET_PSW_MSE_TIMEOUT = HYFI_PSW_FIRST,
 	HYFI_SET_PSW_DROP_MARKERS,
 	HYFI_SET_PSW_OLD_IF_QUIET_TIME,
 	HYFI_SET_PSW_DUP_PKT_FLUSH_QUOTA,

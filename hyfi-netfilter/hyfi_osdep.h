@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, 2016, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -50,7 +50,6 @@ static inline int hyfi_br_pass_frame_up(struct sk_buff *skb)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0))
 #include <linux/moduleparam.h>
 #include <linux/export.h>
-#include <linux/printk.h>
 static inline struct net_bridge_port *hyfi_br_port_get(const struct net_device *dev)
 {
 	struct net_bridge_port *br_port;
