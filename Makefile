@@ -40,6 +40,10 @@ ifeq ($(strip ${HYBRID_MC_MLD}),1)
 ccflags-y+=-DHYBRID_MC_MLD
 endif
 
+ifeq ($(strip ${PLC_SUPPORT_NETFILTER}),1)
+ccflags-y+=-DPLC_NF_ENABLE
+endif
+
 # #############################################################################
 # Debug flags, set these to = 0 if you want to disable all debugging.
 # By turning off debugs you gain maximum performance.
