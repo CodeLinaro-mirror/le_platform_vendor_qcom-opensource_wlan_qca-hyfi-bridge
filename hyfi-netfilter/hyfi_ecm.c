@@ -194,12 +194,14 @@ static u_int32_t hyfi_ecm_calculate_weighted_average(u_int32_t new_rate,
 	u_int32_t new_weighted_rate = new_rate;
 	u_int32_t old_weighted_rate = old_rate;
 
-	if (!new_elapsed_time && !old_elapsed_time) {
+	u_int32_t total_elapsed_time = new_elapsed_time + old_elapsed_time;
+
+	if (!total_elapsed_time) {
 		return 0;
 	}
 
-	new_weighted_rate /= (new_elapsed_time + old_elapsed_time);
-	old_weighted_rate /= (new_elapsed_time + old_elapsed_time);
+	new_weighted_rate /= total_elapsed_time;
+	old_weighted_rate /= total_elapsed_time;
 
 	return (new_weighted_rate * new_elapsed_time +
 		old_weighted_rate * old_elapsed_time);
@@ -241,15 +243,15 @@ int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int32_t has
                         /* Calculate the rate since the last update */
 			u_int32_t elapsed_time =
 				hyfi_hatbl_calculate_elapsed_time(time_now, flow->last_update);
+			u_int32_t elapsed_time_ms = jiffies_to_msecs(elapsed_time);
 			/* Note that overflow is not handled here.  It is assumed that
 			 * NSS updates will happen more frequently than every 2^32 bytes
 			 */
 			u_int32_t num_sent_bytes = num_bytes - ha->prev_num_bytes;
 			/* Multiply by 8 to convert bytes to bits */
 			u_int32_t rate_now = 0;
-			if (elapsed_time) {
-				rate_now = (num_sent_bytes * 8) /
-					(jiffies_to_msecs(elapsed_time));
+			if (elapsed_time_ms) {
+				rate_now = (num_sent_bytes * 8) / elapsed_time_ms;
 			}
 			rate_now *= 1000;
 
@@ -273,7 +275,7 @@ int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int32_t has
 
 			DEBUG_TRACE("hyfi: Hash 0x%02x, serial=%d, num_bytes=%d, num_packets=%d, rate=%u, elapsed time %u ms, new_elapsed_time %u ms\n",
 				hash, flow->ecm_serial, ha->num_bytes, ha->num_packets,
-				ha->rate, jiffies_to_msecs(elapsed_time),
+				ha->rate, elapsed_time_ms,
 				jiffies_to_msecs(*new_elapsed_time));
 
 		}
