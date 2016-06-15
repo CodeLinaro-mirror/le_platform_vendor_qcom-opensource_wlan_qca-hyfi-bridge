@@ -613,7 +613,8 @@ static struct mc_fdb_group *mc_fdb_group_get(struct mc_struct *mc,
     return fg;
 }
 
-static struct mc_fdb_group *mc_update_hybrid_fdb_group(struct hlist_head *pslist, 
+static struct mc_fdb_group *mc_update_hybrid_fdb_group(struct mc_struct *mc,
+        struct hlist_head *pslist, 
         __u8 *mac, __be32 now, struct net_bridge_port *port)
 {
     struct mc_port_group *pg;
@@ -634,6 +635,13 @@ static struct mc_fdb_group *mc_update_hybrid_fdb_group(struct hlist_head *pslist
 	 */
         os_hlist_for_each_entry_rcu(fg, fgh, &pg->fslist, fslist) {
             if (!compare_ether_addr(mac, fg->mac)) {
+                if (pg->port != port) {
+                    spin_lock_bh(&mc->lock);
+                    mc_fdb_group_destroy(fg);
+                    spin_unlock_bh(&mc->lock);
+                    return NULL;
+                }
+
                 pg->ageing_timer = now;
                 fg->ageing_timer = now;
                 return fg;
@@ -668,7 +676,7 @@ static struct mc_fdb_group *mc_update_mdb(struct mc_struct *mc,
     }
     MC_SKB_CB(skb)->mdb = mdb;
 
-    if ((fg = mc_update_hybrid_fdb_group(&mdb->pslist, fdb->addr.addr, now, port)))
+    if ((fg = mc_update_hybrid_fdb_group(mc, &mdb->pslist, fdb->addr.addr, now, port)))
         return fg;
 
     pg = mc_port_group_find(&mdb->pslist, port);
