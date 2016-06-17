@@ -638,8 +638,8 @@ int hyfi_hatbl_update_local(struct hyfi_net_bridge *br, u_int32_t hash,
 	return 0;
 }
 
-int hyfi_hatbl_update(struct hyfi_net_bridge *br, struct __hatbl_entry *hae,
-		int update_local)
+int hyfi_hatbl_update(struct hyfi_net_bridge *br, struct net_device *brdev,
+	struct __hatbl_entry *hae, int update_local)
 {
 	int status = 0;
 	struct hlist_head *head = &br->hash_ha[hae->hash];
@@ -667,10 +667,10 @@ int hyfi_hatbl_update(struct hyfi_net_bridge *br, struct __hatbl_entry *hae,
 		goto out;
 	}
 
-	dev = dev_get_by_index(dev_net(br->dev), hae->port_list[0].port);
+	dev = dev_get_by_index(dev_net(brdev), hae->port_list[0].port);
 	br_port = hyfi_br_port_get(dev);
 
-	if (likely(dev && br_port && br_port->br->dev == br->dev)) {
+	if (likely(dev && br_port && br_port->br->dev == brdev)) {
 		int if_change = ha->dst->dev->ifindex != dev->ifindex;
 
 		pha_psw_stm_entry = &ha->psw_stm_entry;

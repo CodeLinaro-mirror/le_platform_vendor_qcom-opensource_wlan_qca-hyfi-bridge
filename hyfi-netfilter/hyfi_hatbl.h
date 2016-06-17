@@ -145,7 +145,7 @@ extern struct net_hatbl_entry* hyfi_hatbl_insert_ecm_classifier(struct hyfi_net_
 		u_int32_t priority, const u_int8_t* sa, u_int32_t ecm_serial);
 
 extern int hyfi_hatbl_update(struct hyfi_net_bridge *br,
-		struct __hatbl_entry *hae, int update_local);
+		struct net_device *brdev, struct __hatbl_entry *hae, int update_local);
 
 extern int hyfi_hatbl_addentry(struct hyfi_net_bridge *br,
 		struct __hatbl_entry *hae);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012, 2016, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -82,9 +82,9 @@ extern void hyfi_hdtbl_cleanup(unsigned long arg);
 extern int hyfi_hdtbl_fillbuf(struct hyfi_net_bridge *br, void *buf,
 		u_int32_t buf_len, u_int32_t offsite, u_int32_t *bytes_written);
 extern int hyfi_hdtbl_insert(struct hyfi_net_bridge *br,
-		struct __hdtbl_entry *hde);
+		struct net_device *brdev, struct __hdtbl_entry *hde);
 extern int hyfi_hdtbl_update(struct hyfi_net_bridge *br,
-		struct __hdtbl_entry *hde);
+		struct net_device *brdev, struct __hdtbl_entry *hde);
 extern int hyfi_hdtbl_delete(struct hyfi_net_bridge *br,
 		const unsigned char *addr);
 extern int hyfi_hdtbl_delete_byid(struct hyfi_net_bridge *br,

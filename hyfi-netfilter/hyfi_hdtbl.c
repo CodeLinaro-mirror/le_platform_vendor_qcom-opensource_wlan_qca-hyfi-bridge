@@ -233,7 +233,8 @@ static int hdtbl_insert(struct hyfi_net_bridge *br,
 	return 0;
 }
 
-int hyfi_hdtbl_insert(struct hyfi_net_bridge *br, struct __hdtbl_entry *hde)
+int hyfi_hdtbl_insert(struct hyfi_net_bridge *br, struct net_device *br_dev,
+	struct __hdtbl_entry *hde)
 {
 	int ret = -EINVAL;
 	struct net_device *dev_udp, *dev_other;
@@ -241,11 +242,11 @@ int hyfi_hdtbl_insert(struct hyfi_net_bridge *br, struct __hdtbl_entry *hde)
 	do {
 		struct net_bridge_port *br_port_u, *br_port_o;
 
-		dev_udp = dev_get_by_index(dev_net(br->dev), hde->udp_port);
+		dev_udp = dev_get_by_index(dev_net(br_dev), hde->udp_port);
 		if (dev_udp == NULL )
 			break;
 
-		dev_other = dev_get_by_index(dev_net(br->dev), hde->other_port);
+		dev_other = dev_get_by_index(dev_net(br_dev), hde->other_port);
 		if (dev_other == NULL ) {
 			dev_put(dev_udp);
 			break;
@@ -311,18 +312,22 @@ int hyfi_hdtbl_delete(struct hyfi_net_bridge *br, const u_int8_t *addr)
 	return 0;
 }
 
-int hyfi_hdtbl_update(struct hyfi_net_bridge *br, struct __hdtbl_entry *hde)
+int hyfi_hdtbl_update(struct hyfi_net_bridge *br, struct net_device *br_dev,
+	struct __hdtbl_entry *hde)
 {
 	struct hlist_head *head = &br->hash_hd[hdtbl_mac_hash(hde->mac_addr)];
 	struct net_hdtbl_entry *hd;
-	struct net_device *dev_udp = dev_get_by_index(dev_net(br->dev),
-			hde->udp_port);
-	struct net_device *dev_other = dev_get_by_index(dev_net(br->dev),
-			hde->other_port);
+	struct net_device *dev_udp, *dev_other;
 	struct net_bridge_port *br_port_u;
 	struct net_bridge_port *br_port_o;
 
-	if(!dev_udp || !dev_other) {
+	dev_udp = dev_get_by_index(dev_net(br_dev), hde->udp_port);
+	if(!dev_udp) {
+		return -EINVAL;
+	}
+	dev_other = dev_get_by_index(dev_net(br_dev), hde->other_port);
+	if(!dev_other) {
+		dev_put(dev_udp);
 		return -EINVAL;
 	}
 
@@ -330,6 +335,8 @@ int hyfi_hdtbl_update(struct hyfi_net_bridge *br, struct __hdtbl_entry *hde)
 	br_port_o = hyfi_br_port_get(dev_other);
 
 	if(!br_port_u || !br_port_o) {
+		dev_put(dev_udp);
+		dev_put(dev_other);
 		return -EINVAL;
 	}
 

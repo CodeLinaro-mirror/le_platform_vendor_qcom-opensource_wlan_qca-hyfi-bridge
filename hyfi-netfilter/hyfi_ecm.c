@@ -140,6 +140,7 @@ static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br,
 			}
 		} else {
 			struct net_bridge_fdb_entry *dst;
+			struct net_device *br_dev;
 			DEBUG_TRACE("hyfi: no hd to %02X:%02X:%02X:%02X:%02X:%02X\n", da[0],
 					da[1], da[2], da[3],
 					da[4], da[5] );
@@ -147,12 +148,30 @@ static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br,
 			/* No such H-Default entry, unlock hd-lock */
 			spin_unlock_bh(&hyfi_br->hash_hd_lock);
 
-			dst = os_br_fdb_get(netdev_priv(hyfi_br->dev), da);
+			rcu_read_lock();
+			br_dev = hyfi_bridge_dev_get_rcu(hyfi_br);
+			if (!br_dev) {
+
+				rcu_read_unlock();
+
+				/* Hy-Fi bridge must have been detached while this function was
+				 running */
+				DEBUG_TRACE("hyfi: Bridge detached while processing, failed to create "
+					"new accelerated connection to %02X:%02X:%02X:%02X:%02X:%02X "
+					"from FDB with serial number: %d, hash: 0x%02x",
+					da[0], da[1], da[2], da[3],
+					da[4], da[5], flow->ecm_serial, hash);
+
+				return 2;
+			}
+
+			dst = os_br_fdb_get(netdev_priv(br_dev), da);
 			/* Try and insert from FDB */
 			if (dst && !dst->is_local) {
 				ha = hyfi_hatbl_insert_from_fdb(hyfi_br, hash, dst->dst, sa,
 					da, hyfi_br->dev->dev_addr,
 					traffic_class, flow->priority, true /* keep_lock */);
+				rcu_read_unlock();
 				if (ha) {
 					*ha_ret = ha;
 					*unlock_bh = false;
@@ -166,6 +185,7 @@ static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br,
 					return -1;
 				}
 			}
+			rcu_read_unlock();
 			/* Not found in FDB either - can't handle */
 			return 1;
 		}
@@ -426,13 +446,10 @@ EXPORT_SYMBOL(hyfi_ecm_port_matches);
 
 bool hyfi_ecm_is_port_on_hyfi_bridge(int32_t system_index)
 {
-	struct hyfi_net_bridge *hyfi_br;
 	struct net_device *dev;
 	bool ret = false;
 
-	hyfi_br = hyfi_bridge_get(HYFI_BRIDGE_ME);
-
-	if (!hyfi_br) {
+	if (!hyfi_ecm_bridge_attached()) {
 		/* Hy-Fi bridge not attached */
 		return ret;
 	}

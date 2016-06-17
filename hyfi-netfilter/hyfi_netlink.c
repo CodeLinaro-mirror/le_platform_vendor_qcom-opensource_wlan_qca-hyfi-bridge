@@ -35,6 +35,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 {
 	struct net_device *brdev = NULL;
 	struct hyfi_net_bridge *br = hyfi_bridge_get(HYFI_BRIDGE_ME);
+	struct net_device *bridge_dev = NULL;
 	struct sk_buff *skb;
 	struct nlmsghdr *nlh = NULL;
 	void *hymsgdata = NULL;
@@ -59,44 +60,63 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 		msgtype = nlh->nlmsg_type;
 
 		do {
-			if (msgtype == HYFI_ATTACH_BRIDGE) {
+			if (msgtype == HYFI_ATTACH_BRIDGE ||
+				msgtype == HYFI_DETACH_BRIDGE ||
+				msgtype == HYFI_GET_BRIDGE) {
+				bool release_read_lock = false;
+
 				if (br) {
-					DEBUG_INFO("hyfi: Already attached to bridge %s\n",
-							br->dev->name);
-				} else {
-					if (hyfi_bridge_set_bridge_name(hymsghdr->if_name)) {
-					        DEBUG_ERROR("hyfi: failed to attach bridge %s\n",hymsghdr->if_name);
+					rcu_read_lock();
+					bridge_dev = hyfi_bridge_dev_get_rcu(br);
+					release_read_lock = true;
+				}
+				if (msgtype == HYFI_ATTACH_BRIDGE) {
+					if (br && bridge_dev) {
+						DEBUG_INFO("hyfi: Already attached to bridge %s\n",
+								bridge_dev->name);
+					} else {
+						/* Can't call set_bridge_name under rcu_read_lock */
+						if (release_read_lock) {
+							release_read_lock = false;
+							rcu_read_unlock();
+						}
+						if (hyfi_bridge_set_bridge_name(hymsghdr->if_name)) {
+								DEBUG_ERROR("hyfi: failed to attach bridge %s\n",hymsghdr->if_name);
+							hymsghdr->status = HYFI_STATUS_FAILURE;
+						}
+					}
+				} else if (msgtype == HYFI_DETACH_BRIDGE) {
+					if (!br || !bridge_dev || strcmp(bridge_dev->name, hymsghdr->if_name)) {
+						DEBUG_ERROR("hyfi: Not attached to bridge %s\n",
+								hymsghdr->if_name);
 						hymsghdr->status = HYFI_STATUS_FAILURE;
+					} else {
+						/* Can't call set_bridge_name under rcu_read_lock */
+						if (release_read_lock) {
+							release_read_lock = false;
+							rcu_read_unlock();
+						}
+						if (hyfi_bridge_set_bridge_name(NULL )) {
+							hymsghdr->status = HYFI_STATUS_FAILURE;
+						}
+					}
+				} else if (msgtype == HYFI_GET_BRIDGE) {
+					if (!br || !bridge_dev) {
+						brinfo.ifindex = -ENODEV;
+						brinfo.flags = 0;
+						hymsghdr->status = HYFI_STATUS_FAILURE;
+					} else {
+
+						brinfo.ifindex = bridge_dev->ifindex;
+						brinfo.flags = br->flags;
+
+						*(struct __hybr_info*) hymsgdata = brinfo;
 					}
 				}
-				break;
-			}
 
-			if (msgtype == HYFI_DETACH_BRIDGE) {
-				if (!br || strcmp(br->dev->name, hymsghdr->if_name)) {
-					DEBUG_ERROR("hyfi: Not attached to bridge %s\n",
-							hymsghdr->if_name);
-					hymsghdr->status = HYFI_STATUS_FAILURE;
-				} else {
-					if (hyfi_bridge_set_bridge_name(NULL )) {
-						hymsghdr->status = HYFI_STATUS_FAILURE;
-					}
-				}
-				break;
-			}
+				if (release_read_lock)
+					rcu_read_unlock();
 
-			if (msgtype == HYFI_GET_BRIDGE) {
-				if (!br) {
-					brinfo.ifindex = -ENODEV;
-					brinfo.flags = 0;
-					hymsghdr->status = HYFI_STATUS_FAILURE;
-					break;
-				}
-
-				brinfo.ifindex = br->dev->ifindex;
-				brinfo.flags = br->flags;
-
-				*(struct __hybr_info*) hymsgdata = brinfo;
 				break;
 			}
 
@@ -166,7 +186,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 						/ sizeof(struct __hatbl_entry);
 				u32 errcnt = 0;
 				for (i = 0; i < num_entries; i++, p++) {
-					retval = hyfi_hatbl_update(br, p, 0);
+					retval = hyfi_hatbl_update(br, brdev, p, 0);
 					if (retval != HYFI_STATUS_SUCCESS) {
 						errcnt++;
 					}
@@ -180,7 +200,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 			case HYFI_UPDATE_HATBL_ENTRY: {
 				struct __hatbl_entry *p = hymsgdata;
 
-				retval = hyfi_hatbl_update(br, p, 1);
+				retval = hyfi_hatbl_update(br, brdev, p, 1);
 
 				if (retval)
 					hymsghdr->status = HYFI_STATUS_NOT_FOUND;
@@ -194,7 +214,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 						/ sizeof(struct __hdtbl_entry);
 				u32 errcnt = 0;
 				for (i = 0; i < num_entries; i++, p++) {
-					retval = hyfi_hdtbl_update(br, p);
+					retval = hyfi_hdtbl_update(br, brdev, p);
 					if (retval != HYFI_STATUS_SUCCESS) {
 						errcnt++;
 					}
@@ -210,7 +230,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				u32 i, num_entries = hymsghdr->buf_len
 						/ sizeof(struct __hdtbl_entry);
 				for (i = 0; i < num_entries; i++, p++) {
-					retval = hyfi_hdtbl_insert(br, p);
+					retval = hyfi_hdtbl_insert(br, brdev, p);
 					if (retval == -EINVAL) {
 						hymsghdr->status = HYFI_STATUS_INVALID_PARAMETER;
 						break;

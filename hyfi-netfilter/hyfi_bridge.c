@@ -45,20 +45,43 @@ static int hyfi_bridge_deinit_bridge_device(void);
 static int hyfi_bridge_del_ports(void);
 static void hyfi_destroy_port_rcu(struct rcu_head *head);
 
+/**
+ * @brief Synchronize with RCU and release the bridge device
+ *
+ * Note this function must call synchronize_rcu before putting
+ * the device.  Other users rely on hyfi_bridge holding the
+ * device to ensure it is valid while they are using it.  These
+ * users get a reference to br_dev under rcu_read_lock, so this
+ * function must ensure they have all exited the rcu_read_lock
+ * before releasing the device.
+ *
+ * @pre Must not hold any locks
+ * @pre dev_hold has been previously called on br_dev
+ *
+ * @param [in] br_dev  device to release hold on
+ */
+static void hyfi_sync_and_free_bridge_device(struct net_device *br_dev) {
+	synchronize_rcu();
+	dev_put(br_dev);
+}
+
 int hyfi_bridge_set_bridge_name(const char *br_name)
 {
 	int retval = 0;
+	struct net_device *br_dev;
 
 	spin_lock_bh(&hyfi_br.lock);
 
+	br_dev = hyfi_br.dev;
+
 	if (!br_name) {
-		if (hyfi_br.dev) {
+		if (br_dev) {
 			/* Detach from existing bridge */
 			hyfi_bridge_deinit_bridge_device();
-			hyfi_linux_bridge[0] = 0;
 		}
 
 		spin_unlock_bh(&hyfi_br.lock);
+		hyfi_sync_and_free_bridge_device(br_dev);
 		return 0;
 	}
 
@@ -78,6 +101,9 @@ int hyfi_bridge_set_bridge_name(const char *br_name)
 	retval = hyfi_bridge_init_bridge_device(br_name);
 
 	spin_unlock_bh(&hyfi_br.lock);
+
+	if (br_dev)
+		hyfi_sync_and_free_bridge_device(br_dev);
 	return retval;
 }
 
@@ -91,6 +117,7 @@ const char *hyfi_bridge_get_bridge_name(void)
 
 int hyfi_bridge_dev_event(unsigned long event, struct net_device *dev)
 {
+	struct net_device *br_dev;
 	spin_lock_bh(&hyfi_br.lock);
 
 	if (hyfi_br.dev && dev != hyfi_br.dev) {
@@ -104,6 +131,8 @@ int hyfi_bridge_dev_event(unsigned long event, struct net_device *dev)
 			break;
 
 		DEBUG_TRACE("Interface %s is down, ptr = %p\n", dev->name, dev);
+
+		br_dev = hyfi_br.dev;
 
 		/* Free the hold of the device */
 		hyfi_bridge_deinit_bridge_device();
@@ -121,7 +150,8 @@ int hyfi_bridge_dev_event(unsigned long event, struct net_device *dev)
 			} else {
 				if (hyfi_bridge_init_bridge_device(hyfi_linux_bridge)) {
 					DEBUG_ERROR("hyfi-bridging: Failed to initialize device %s\n", dev->name);
-					hyfi_br.dev = NULL;
+					br_dev = hyfi_br.dev;
+					hyfi_bridge_deinit_bridge_device();
 				}
 			}
 		}
@@ -135,6 +165,9 @@ int hyfi_bridge_dev_event(unsigned long event, struct net_device *dev)
 	}
 
 	spin_unlock_bh(&hyfi_br.lock);
+
+	if (br_dev)
+		hyfi_sync_and_free_bridge_device(br_dev);
 	return 0;
 }
 
@@ -272,6 +305,12 @@ struct hyfi_net_bridge *hyfi_bridge_get(const struct net_bridge *br)
 		return &hyfi_br;
 
 	return NULL;
+}
+
+struct net_device *hyfi_bridge_dev_get_rcu(const struct hyfi_net_bridge *br)
+{
+	struct net_device *dev = rcu_dereference(hyfi_br.dev);
+	return dev;
 }
 
 struct hyfi_net_bridge *hyfi_bridge_get_by_dev(const struct net_device *dev)
@@ -713,6 +752,7 @@ int hyfi_bridge_should_deliver(const struct hyfi_net_bridge_port *src,
 static int hyfi_bridge_deinit_bridge_device(void)
 {
 	struct net_device *br_dev;
+	hyfi_linux_bridge[0] = 0;
 
 	/* Detach from existing bridge */
 	br_dev = hyfi_br.dev;
@@ -734,8 +774,11 @@ static int hyfi_bridge_deinit_bridge_device(void)
 	hyfi_hatbl_flush(&hyfi_br);
 	hyfi_hdtbl_flush(&hyfi_br);
 
-	dev_put(hyfi_br.dev);
-	hyfi_br.dev = NULL;
+	rcu_assign_pointer(hyfi_br.dev, NULL);
+	/*
+	 * Note: Can't put the device until RCU is synchronized, which can't
+	 * be done under lock.
+	 */
 
 	DEBUG_INFO("hyfi: Bridge %s is now detached\n", br_dev->name);
 	return 0;
@@ -766,7 +809,7 @@ static int hyfi_bridge_init_bridge_device(const char *br_name)
 
 	/* Init ports */
 	hyfi_bridge_ports_init(br_dev);
-	hyfi_br.dev = br_dev;
+	rcu_assign_pointer(hyfi_br.dev, br_dev);
 
 	/* see br_input.c */
 	rcu_assign_pointer(br_get_dst_hook, hyfi_bridge_get_dst);

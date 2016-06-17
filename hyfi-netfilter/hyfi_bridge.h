@@ -69,6 +69,17 @@ struct hyfi_net_bridge *hyfi_bridge_get_by_dev(const struct net_device *dev);
 struct hyfi_net_bridge_port * hyfi_bridge_get_port(const struct net_bridge_port *p);
 struct hyfi_net_bridge_port * hyfi_bridge_get_port_by_dev(const struct net_device *dev);
 
+/**
+ * @brief Get the Hy-Fi bridge device.  This protects us during
+ *        operations where Hy-Fi may be detached asynchronously.
+ * 
+ * @pre Must be called with rcu_read_lock
+ *
+ * @return Pointer to hyfi_br.dev if bridge is attached, NULL
+ *         otherwise
+ */
+struct net_device *hyfi_bridge_dev_get_rcu(const struct hyfi_net_bridge *br);
+
 static inline bool hyfi_brmode_relay_override(
 		const struct hyfi_net_bridge *hyfi_br)
 {

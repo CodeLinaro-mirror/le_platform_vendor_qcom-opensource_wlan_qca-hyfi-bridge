@@ -96,6 +96,13 @@ struct nf_hook_ops hyfi_hook_ops[] __read_mostly =
     }
 };
 
+/*
+ * Note in all these functions RCU logic is skipped when accessing the
+ * hyfi_br->dev pointer.  These functions are called in the network stack,
+ * so the bridge can not be deleted while processing is in progress. Skipping
+ * rcu_dereference to save some cycles.
+*/
+
 #define IEEE1905_MULTICAST_ADDR     "\x01\x80\xC2\x00\x00\x13" /* IEEE 1905.1 Multicast address */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
 unsigned int hyfi_netfilter_forwarding_hook(const struct nf_hook_ops *ops,
@@ -206,10 +213,15 @@ unsigned int hyfi_netfilter_local_in_hook(unsigned int hooknum,
 		const struct net_device *out, int (*okfn)(struct sk_buff *))
 #endif
 {
-    struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(in);
+	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(in);
+	struct net_device *br_dev;
 
-    if (unlikely(!hyfi_br))
-        return NF_ACCEPT;
+	if (unlikely(!hyfi_br))
+		return NF_ACCEPT;
+
+	br_dev = hyfi_br->dev;
+	if (unlikely(!br_dev))
+		return NF_ACCEPT;
 
 	/* Is it an IEEE1905.1/LLDP/HCP packet? */
 	if (unlikely(
@@ -220,7 +232,7 @@ unsigned int hyfi_netfilter_local_in_hook(unsigned int hooknum,
 			struct sk_buff *skb2 = skb_clone(skb, GFP_ATOMIC);
 
 			if (skb2) {
-				skb2->dev = hyfi_br->dev;
+				skb2->dev = br_dev;
 				netif_receive_skb(skb2);
 			}
 
@@ -245,23 +257,29 @@ unsigned int hyfi_netfilter_pre_routing_hook(unsigned int hooknum,
 	struct net_bridge_port *br_port = hyfi_br_port_get(in);
 	struct hyfi_net_bridge_port *hyfi_p  = hyfi_bridge_get_port(br_port);
 	struct net_bridge_fdb_entry *dst;
+	struct net_device *br_dev;
+
+	if (!hyfi_br || !br_port || !hyfi_p)
+		return NF_ACCEPT;
+
+	br_dev = hyfi_br->dev;
+	if (!br_dev)
+		return NF_ACCEPT;
 
 #ifndef PLC_NF_ENABLE
-	if (unlikely(hyfi_is_ieee1901_pkt(skb) && hyfi_br)) {
+	if (unlikely(hyfi_is_ieee1901_pkt(skb))) {
 		struct sk_buff *skb2 = skb_clone(skb, GFP_ATOMIC);
 
 		if (skb2) {
-			memcpy(eth_hdr(skb2)->h_dest, hyfi_br->dev->dev_addr, ETH_ALEN);
+			memcpy(eth_hdr(skb2)->h_dest, br_dev->dev_addr, ETH_ALEN);
 			skb2->pkt_type = PACKET_HOST;
-			skb2->dev = hyfi_br->dev;
+			skb2->dev = br_dev;
 			netif_receive_skb(skb2);
 		}
 
 		return NF_DROP;
 	}
 #endif
-	if (!hyfi_br || !br_port || !hyfi_p)
-		return NF_ACCEPT;
 
 	if (hyfi_brmode_relay_override(hyfi_br)) {
 		goto out;
