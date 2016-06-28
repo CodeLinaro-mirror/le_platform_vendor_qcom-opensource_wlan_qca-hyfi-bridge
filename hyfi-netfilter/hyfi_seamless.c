@@ -284,6 +284,10 @@ void hyfi_psw_pkt_track(struct sk_buff *skb, struct net_hatbl_entry *ha,
 
 		pha_psw_stm_entry->q_len++;
 
+		DEBUG_TRACE("Hash 0x%x, DA %02x:%02x:%02x:%02x:%02x:%02x: Warning: Increment "
+			"of skb->users is not supported, may cause future crash\n",
+			ha->hash, ha->da.addr[0], ha->da.addr[1], ha->da.addr[2],
+			ha->da.addr[3], ha->da.addr[4], ha->da.addr[5]);
 		atomic_inc(&skb->users);
 
 		hyfi_skb_track->network_header = skb->data - skb->head;
@@ -330,6 +334,10 @@ void hyfi_psw_pkt_track(struct sk_buff *skb, struct net_hatbl_entry *ha,
 				break;
 		} while (1);
 
+		DEBUG_TRACE("Hash 0x%x, DA %02x:%02x:%02x:%02x:%02x:%02x: Warning: Increment "
+			"of skb->users is not supported, may cause future crash\n",
+			ha->hash, ha->da.addr[0], ha->da.addr[1], ha->da.addr[2],
+			ha->da.addr[3], ha->da.addr[4], ha->da.addr[5]);
 		atomic_inc(&skb->users);
 
 		hyfi_skb_track = (struct hyfi_skb_track *) skb->head;
