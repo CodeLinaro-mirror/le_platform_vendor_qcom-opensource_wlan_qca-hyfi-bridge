@@ -81,7 +81,9 @@ int hyfi_bridge_set_bridge_name(const char *br_name)
 		}
 
 		spin_unlock_bh(&hyfi_br.lock);
-		hyfi_sync_and_free_bridge_device(br_dev);
+		if (br_dev) {
+			hyfi_sync_and_free_bridge_device(br_dev);
+		}
 		return 0;
 	}
 
@@ -117,7 +119,7 @@ const char *hyfi_bridge_get_bridge_name(void)
 
 int hyfi_bridge_dev_event(unsigned long event, struct net_device *dev)
 {
-	struct net_device *br_dev;
+	struct net_device *br_dev = NULL;
 	spin_lock_bh(&hyfi_br.lock);
 
 	if (hyfi_br.dev && dev != hyfi_br.dev) {

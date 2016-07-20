@@ -27,7 +27,9 @@ static void mc_acltbl_update(struct mc_struct *mc, void *param)
     int i;
     struct mc_param_pattern pattern;
     struct __mc_param_acl_rule *ar = (struct __mc_param_acl_rule *)param;
-          
+    const size_t pattern_size = (sizeof pattern - sizeof pattern.rule > ETH_ALEN) ?
+        ETH_ALEN : sizeof pattern - sizeof pattern.rule;
+
     memset(&pattern, 0, sizeof pattern);
     if (ar->pattern_type == MC_ACL_PATTERN_IGMP) {
         pattern.rule = ar->pattern.rule;
@@ -44,8 +46,8 @@ static void mc_acltbl_update(struct mc_struct *mc, void *param)
             }
         } else if (!is_zero_ether_addr(pattern.mac)) {
             for (i = 0; i < mc->igmp_acl.pattern_count; i++) {
-                if (!memcmp(mc->igmp_acl.patterns[i].mac, pattern.mac, 
-                        sizeof pattern - sizeof pattern.rule))
+                if (!memcmp(mc->igmp_acl.patterns[i].mac, pattern.mac,
+                        pattern_size))
                     break;
             }
         } else {
@@ -101,10 +103,6 @@ static void mc_acltbl_update(struct mc_struct *mc, void *param)
             }
         } else if (!is_zero_ether_addr(pattern.mac)) {
             for (i = 0; i < mc->mld_acl.pattern_count; i++) {
-            	u_int32_t pattern_size = sizeof pattern - sizeof pattern.rule;
-
-            	if (pattern_size > ETH_ALEN)
-            		pattern_size = ETH_ALEN;
                 if (!memcmp(mc->mld_acl.patterns[i].mac, pattern.mac, pattern_size))
                     break;
             }
