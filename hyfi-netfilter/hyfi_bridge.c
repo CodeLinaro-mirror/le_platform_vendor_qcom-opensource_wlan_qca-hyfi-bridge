@@ -356,16 +356,6 @@ static inline struct net_bridge_port *hyfi_bridge_handle_ha(struct net_hatbl_ent
 		ha->num_bytes += (*skb)->len;
 		hyfi_ha_clear_flag(ha, HYFI_HACTIVE_TBL_ACCL_ENTRY);
 
-		if (hyfi_br.path_switch_param.enable_path_switch
-				&& (ha->flags & HYFI_HACTIVE_TBL_SEAMLESS_ENABLED)) {
-			hyfi_psw_pkt_track(*skb, ha, HYFI_FORWARD_PKT);
-
-			if ((ha->psw_stm_entry.tx_pkt_cnt++
-					& (HYFI_PSW_PKT_CNT - 1)) == 0) {
-				hyfi_psw_send_pkt(&hyfi_br, ha, HYFI_PSW_PKT_5, 0);
-			}
-		}
-
 		return dst;
 	}
 
@@ -585,11 +575,6 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 				return ha->dst;
 
 			return (struct net_bridge_port *) -1;
-		}
-
-		if(unlikely(IS_IFACE_THROTTLED(ha))) {
-			hyfi_psw_throttle(&hyfi_br, ha, skb, HYFI_FORWARD_PKT);
-			return ha->dst;
 		}
 	}
 

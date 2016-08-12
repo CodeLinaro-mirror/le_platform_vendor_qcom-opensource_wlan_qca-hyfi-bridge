@@ -536,13 +536,6 @@ int hyfi_aggr_update_flow(struct hyfi_net_bridge *br, struct __hatbl_entry *hae,
 
 	DEBUG_TRACE("hyfi: Updating aggregated flow 0x%02x\n", ha->hash);
 
-	if (br->path_switch_param.enable_path_switch
-			&& hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_SEAMLESS_ENABLED)) {
-		/* If seamless failover is enabled for this flow, disable it */
-		hyfi_ha_clear_flag(ha, HYFI_HACTIVE_TBL_SEAMLESS_ENABLED);
-		hyfi_psw_flush_track_q(&ha->psw_stm_entry);
-	}
-
 	if (ha->aggr_seq_data.aggr_cur_iface < HYFI_AGGR_MAX_IFACE) {
 		cur_iface = ha->aggr_seq_data.aggr_cur_iface;
 	} else {
@@ -631,13 +624,6 @@ int hyfi_aggr_new_flow(struct hyfi_net_bridge *br, struct __hatbl_entry *hae,
 
 	spin_lock_bh(&ha->aggr_lock);
 	hyfi_ha_set_flag(ha, HYFI_HACTIVE_TBL_AGGR_TX_ENTRY);
-
-	if (br->path_switch_param.enable_path_switch
-			&& hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_SEAMLESS_ENABLED)) {
-		/* If seamless failover is enabled for this flow, disable it */
-		hyfi_ha_clear_flag(ha, HYFI_HACTIVE_TBL_SEAMLESS_ENABLED);
-		hyfi_psw_flush_track_q(&ha->psw_stm_entry);
-	}
 
 	/* Clear information structure */
 	memset(ha->iface_info, 0, sizeof(ha->iface_info));

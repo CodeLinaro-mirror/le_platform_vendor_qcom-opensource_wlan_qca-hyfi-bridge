@@ -57,7 +57,6 @@ static void hatbl_rcu_free(struct rcu_head *head)
 
 	hyfi_psw_flush_track_q(&ha->psw_stm_entry);
 	hyfi_psw_flush_buf_q(ha);
-	hyfi_psw_flush_throt_q(ha);
 	hyfi_aggr_flush(ha);
 
 	kmem_cache_free(hyfi_hatbl_cache, ha);
@@ -188,10 +187,6 @@ static void hatbl_fillbuf(struct net_hatbl_entry *ha, struct __hatbl_entry *hae)
 		hae->static_entry = 1;
 	else
 		hae->static_entry = 0;
-	if (hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_SEAMLESS_ENABLED))
-		hae->psw_enable = 1;
-	else
-		hae->psw_enable = 0;
 
 	if (hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_ACCL_ENTRY)) {
 		hae->accl_entry = 1;
@@ -703,7 +698,6 @@ int hyfi_hatbl_update(struct hyfi_net_bridge *br, struct net_device *brdev,
 			pha_psw_stm_entry->mrk_id++;
 		}
 
-		path_switch_handle(br, ha, br_port, hae);
 	} else {
 		hatbl_delete(br, ha);
 	}
@@ -838,13 +832,7 @@ void hyfi_hatbl_fini(struct hyfi_net_bridge *br)
 			br->ha_entry_cnt--;
 			hlist_del_rcu(&ha->hlist);
 
-			if (br->path_switch_param.enable_path_switch
-					&& (ha->flags & HYFI_HACTIVE_TBL_SEAMLESS_ENABLED)) {
-				hyfi_psw_flush_track_q(&ha->psw_stm_entry);
-			}
-
 			hyfi_psw_flush_buf_q(ha);
-			hyfi_psw_flush_throt_q(ha);
 			hyfi_aggr_flush(ha);
 
 			kmem_cache_free(hyfi_hatbl_cache, ha);

@@ -52,12 +52,6 @@ static void hyfi_ecm_mark_as_newly_accelerated(u_int64_t num_bytes, u_int64_t nu
 		flow->ecm_serial, ha->ecm_serial, ha->hash,
 		!hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_STATIC_ENTRY));
 
-	/* Flush seamless buffer - does not apply for accelerated flows */
-	if (hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_SEAMLESS_ENABLED)) {
-		hyfi_ha_clear_flag(ha, HYFI_HACTIVE_TBL_SEAMLESS_ENABLED);
-		hyfi_psw_flush_track_q(&ha->psw_stm_entry);
-	}
-
 	hyfi_hatbl_mark_accelerated(ha, flow->ecm_serial);
 	ha->prev_num_bytes = num_bytes;
 	ha->prev_num_packets = num_packets;

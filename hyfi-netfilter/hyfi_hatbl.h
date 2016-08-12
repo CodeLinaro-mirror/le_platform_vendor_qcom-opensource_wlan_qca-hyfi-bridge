@@ -31,7 +31,6 @@
 #define HYFI_HACTIVE_TBL_AGING_TIME  (1 << 14)  /* 16384 msec */
 
 #define HYFI_HACTIVE_TBL_STATIC_ENTRY                       (1 << 0)
-#define HYFI_HACTIVE_TBL_SEAMLESS_ENABLED                   (1 << 1)
 #define HYFI_HACTIVE_TBL_TRACKED_ENTRY                      (1 << 2)
 #define HYFI_HACTIVE_TBL_AGGR_RX_ENTRY                      (1 << 3)
 #define HYFI_HACTIVE_TBL_AGGR_TX_ENTRY                      (1 << 4)

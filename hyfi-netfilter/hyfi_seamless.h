@@ -23,8 +23,6 @@
 #include <linux/ip.h>
 #include <linux/if_ether.h>
 
-#define IS_IFACE_THROTTLED( _ha ) ( _ha->psw_stm_entry.throt_q_len )
-
 typedef enum {
 	HYFI_FORWARD_PKT, HYFI_DELIVER_PKT
 
@@ -51,15 +49,6 @@ struct hyfi_skb_buffer {
 };
 
 struct path_switch_param {
-	int enable_path_switch;
-	unsigned int wifi_2_q_max_len;
-	unsigned long wifi_2_max_jiffies_diff;
-	unsigned int wifi_5_q_max_len;
-	unsigned long wifi_5_max_jiffies_diff;
-	unsigned int plc_q_max_len;
-	unsigned long plc_max_jiffies_diff;
-	unsigned int eth_q_max_len;
-	unsigned long eth_max_jiffies_diff;
 	unsigned int enable_switch_markers;
 	unsigned int old_if_quiet_timeout;
 	unsigned int drop_markers;
@@ -69,7 +58,6 @@ struct path_switch_param {
 
 #define HYFI_PSW_PKT_CNT	      1024
 #define HYFI_PSW_MAX_REORD_BUF        3072
-#define HYFI_PSW_DEF_REORD_BUF        512
 #define HYFI_PSW_REORD_TIMEOUT        1500
 #define HYFI_PSW_REORD_FLUSH_QUOTA    2
 #define HYFI_PSW_MSE_CNT              4
@@ -81,22 +69,10 @@ struct ha_psw_stm_entry {
 	spinlock_t track_q_lock;
 	TAILQ_HEAD(hyfi_skb_track_q, hyfi_skb_track)
 	skb_track_q;
-	u_int32_t q_len;
-	u_int32_t q_max_len;
-	unsigned long max_jiffies_diff;
 
 	u_int32_t rmv_pkts;
-	u_int32_t tx_pkt_cnt;
-	u_int16_t idx;
 	u_int16_t last_idx;
 	u_int16_t mrk_id;
-
-	spinlock_t throt_q_lock;
-	struct hyfi_skb_track_q skb_throt_q;
-	u_int32_t throt_q_dup_buf_len;
-	u_int32_t throt_q_len;
-	enum hyInterfaceType throt_buffered_port_type;
-	u_int32_t dup_pkt_cnt;
 };
 
 #define ETHER_ADDR_LEN 6
@@ -113,11 +89,8 @@ struct net_hatbl_entry;
 struct net_bridge;
 
 typedef enum psw_pkt_type {
-	HYFI_PSW_PKT_1 = 0,
-	HYFI_PSW_PKT_2,
-	HYFI_PSW_PKT_3,
+	HYFI_PSW_PKT_3 = 2,
 	HYFI_PSW_PKT_4,
-	HYFI_PSW_PKT_5,
 
 	HYFI_PSW_PKT_UNKNOWN = ~0
 
@@ -161,10 +134,8 @@ struct psw_flow_info {
 	u_int16_t mse_rcv;
 	u_int32_t buf_pkt;
 	u_int32_t buf_dev_idx;
-	u_int32_t buf_size;
 	u_int16_t last_mrk_id;
 	unsigned long last_jiffies;
-	u_int32_t jiffies_delta;
 	u_int32_t mbb_dev_idx;
 	u_int32_t mse_timeout;
 	unsigned long old_if_jiffies;
@@ -184,8 +155,6 @@ void hyfi_psw_adv_param_update(struct hyfi_net_bridge *br, u_int32_t param,
 void hyfi_psw_stm_init(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha);
 void hyfi_psw_pkt_track(struct sk_buff *skb, struct net_hatbl_entry *ha,
 		hyfi_ath_pkt_path_type pkt_path);
-void path_switch_handle(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
-		struct net_bridge_port *dst, struct __hatbl_entry *hae);
 void hyfi_psw_flush_track_q(struct ha_psw_stm_entry *pha_psw_stm_entry);
 void hyfi_psw_send_pkt(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
 		psw_pkt_type pkt_value, u_int16_t dpkt);
@@ -195,7 +164,4 @@ int hyfi_psw_process_pkt(struct net_hatbl_entry *ha, struct sk_buff **skb,
 		const struct hyfi_net_bridge *br);
 int hyfi_psw_flush_buf_q(struct net_hatbl_entry *ha);
 int hyfi_psw_init_entry(struct net_hatbl_entry *ha);
-int hyfi_psw_throttle(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
-		struct sk_buff **skb, hyfi_ath_pkt_path_type pkt_path);
-int hyfi_psw_flush_throt_q(struct net_hatbl_entry *ha);
 #endif

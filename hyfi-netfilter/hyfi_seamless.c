@@ -34,10 +34,6 @@ static const u_int8_t field1[15] = { 0x88, 0xb7, 0x00, 0x03, 0x7f, 0x00, 0x00,
 
 #define TAG_80211Q_START_BYTE_POS 	12
 
-#define HYFI_IS_PSW_PKT_5( pkt )  ( pkt->field5 == HYFI_PSW_PKT_5 && \
-    pkt->field11[0] == 0x35 && \
-    pkt->field11[1] == 0x04 )
-
 struct nbuf_cb {
 	u_int8_t vlan[8]; /* reserve for vlan tag info */
 	void *ni;
@@ -74,37 +70,12 @@ static inline void hyfi_psw_read_idx(struct sk_buff *skb,
 			pkt = (struct psw_pkt *) ((char *) (ethhdr) + 4);
 		}
 	}
-
-	if (unlikely(pkt)) {
-		if (HYFI_IS_PSW_PKT_5( pkt )) {
-			DEBUG_TRACE("Clearing rmv_pkts = %d, index = %d\n",
-					pha_psw_stm_entry->rmv_pkts, pha_psw_stm_entry->last_idx);
-			pha_psw_stm_entry->last_idx = ntohs(pkt->field12);
-			pha_psw_stm_entry->rmv_pkts = 0;
-		}
-	}
-
 }
 
 void hyfi_psw_init(struct hyfi_net_bridge *br)
 {
 
-	br->path_switch_param.enable_path_switch = 0;
 	br->path_switch_param.enable_switch_markers = 0;
-
-	// This will hold 2s 20 Mbit/s UDP data size of 1470 bytes.
-	br->path_switch_param.wifi_2_q_max_len = 4000; // The default pkt tracking q len on WiFi is 4000.
-	br->path_switch_param.wifi_2_max_jiffies_diff = msecs_to_jiffies(2000); // The default pkt tracking time on WiFi is 4000 ms
-
-	br->path_switch_param.wifi_5_q_max_len = 4000; // The default pkt tracking q len on WiFi is 500
-	br->path_switch_param.wifi_5_max_jiffies_diff = msecs_to_jiffies(2000); // The default pkt tracking time on WiFi is 300 ms
-
-	// This will hold 2s 20 Mbit/s UDP data size of 1470 bytes.
-	br->path_switch_param.plc_q_max_len = 4000; // The default pkt tracking q len on PLC is 4000
-	br->path_switch_param.plc_max_jiffies_diff = msecs_to_jiffies(2000); // The default pkt tracking time on PLC is 2000 ms
-
-	br->path_switch_param.eth_q_max_len = 4000; // The default pkt tracking q len on ETH is 4000
-	br->path_switch_param.eth_max_jiffies_diff = msecs_to_jiffies(2000); // The default pkt tracking time on PLC is 2000 ms
 
 	br->path_switch_param.mse_timeout_val = msecs_to_jiffies(
 			HYFI_PSW_REORD_TIMEOUT);
@@ -115,48 +86,12 @@ void hyfi_psw_init(struct hyfi_net_bridge *br)
 }
 
 void hyfi_psw_param_update( struct hyfi_net_bridge *br,
-        struct __path_switch_param *p )
+	struct __path_switch_param *p )
 {
-    br->path_switch_param.enable_path_switch = p->enable_path_switch;
-    br->path_switch_param.enable_switch_markers = p->enable_switch_markers;
+	br->path_switch_param.enable_switch_markers = p->enable_switch_markers;
 
-    if( br->path_switch_param.enable_path_switch ) {
-        br->path_switch_param.wifi_2_q_max_len = p->wifi_2_q_max_len;  // The default pkt tracking q len on WiFi is 200 ms
-        br->path_switch_param.wifi_2_max_jiffies_diff = msecs_to_jiffies(
-                p->wifi_2_tracking_time ); // The default pkt tracking time on WiFi is 200 ms
-
-        br->path_switch_param.wifi_5_q_max_len = p->wifi_5_q_max_len;  // The default pkt tracking q len on WiFi is 200 ms
-        br->path_switch_param.wifi_5_max_jiffies_diff = msecs_to_jiffies(
-                p->wifi_5_tracking_time ); // The default pkt tracking time on WiFi is 200 ms
-
-        br->path_switch_param.plc_q_max_len = p->plc_q_max_len; // The default pkt tracking q len on PLC is 200 ms
-        br->path_switch_param.plc_max_jiffies_diff = msecs_to_jiffies(
-                p->plc_tracking_time ); // The default pkt tracking time on PLC is 200 ms
-
-        br->path_switch_param.eth_q_max_len = p->eth_q_max_len; // The default pkt tracking q len on PLC is 200 ms
-        br->path_switch_param.eth_max_jiffies_diff = msecs_to_jiffies(
-                p->eth_tracking_time ); // The default pkt tracking time on PLC is 200 ms
-
-        DEBUG_INFO("Fail-over seamless path switching: %s\n", "Enabled");
-
-        DEBUG_TRACE("%s[%d] wifi2.4 max qlen=%d, wifi 2.4 max jiffiesdiff=%ld\n", __func__, __LINE__,
-            br->path_switch_param.wifi_2_q_max_len, br->path_switch_param.wifi_2_max_jiffies_diff);
-
-        DEBUG_TRACE("%s[%d] wifi5 max qlen=%d, wifi5 max jiffiesdiff=%ld\n", __func__, __LINE__,
-            br->path_switch_param.wifi_5_q_max_len, br->path_switch_param.wifi_5_max_jiffies_diff);
-
-        DEBUG_TRACE("%s[%d] plc max qlen=%d, plc max jiffiesdiff=%ld\n", __func__, __LINE__,
-            br->path_switch_param.plc_q_max_len, br->path_switch_param.plc_max_jiffies_diff);
-
-        DEBUG_TRACE("%s[%d] eth max qlen =%d, eth max jiffiesdiff=%ld\n", __func__, __LINE__,
-            br->path_switch_param.eth_q_max_len, br->path_switch_param.eth_max_jiffies_diff);
-    }
-    else {
-    	DEBUG_INFO("Fail-over seamless path switching: %s\n", "Disabled");
-    }
-
-    DEBUG_INFO("Load-balancing seamless path switching: %s\n",
-    		br->path_switch_param.enable_switch_markers ? "Enabled" : "Disabled");
+	DEBUG_INFO("Load-balancing seamless path switching: %s\n",
+			br->path_switch_param.enable_switch_markers ? "Enabled" : "Disabled");
 }
 
 void hyfi_psw_adv_param_update(struct hyfi_net_bridge *br, u_int32_t param,
@@ -193,33 +128,6 @@ void hyfi_psw_adv_param_update(struct hyfi_net_bridge *br, u_int32_t param,
 	}
 }
 
-void hyfi_psw_stm_track_param_update(struct hyfi_net_bridge *br,
-		struct ha_psw_stm_entry *pha_psw_stm_entry)
-{
-	spin_lock(&br->lock);
-
-	if (pha_psw_stm_entry->buffered_port_type == hyInterface_WIFI_2G) {
-		pha_psw_stm_entry->q_max_len = br->path_switch_param.wifi_2_q_max_len; // This value is configurable and will be adjusted by the test result
-		pha_psw_stm_entry->max_jiffies_diff =
-				br->path_switch_param.wifi_2_max_jiffies_diff; // This value is configurable and will be adjusted by the test result
-	} else if (pha_psw_stm_entry->buffered_port_type == hyInterface_WIFI_5G) {
-		pha_psw_stm_entry->q_max_len = br->path_switch_param.wifi_5_q_max_len; // This value is configurable and will be adjusted by the test result
-		pha_psw_stm_entry->max_jiffies_diff =
-				br->path_switch_param.wifi_5_max_jiffies_diff; // This value is configurable and will be adjusted by the test result
-	} else if (pha_psw_stm_entry->buffered_port_type == hyInterface_HPAV) {
-		pha_psw_stm_entry->q_max_len = br->path_switch_param.plc_q_max_len;
-		pha_psw_stm_entry->max_jiffies_diff =
-				br->path_switch_param.plc_max_jiffies_diff;
-	} else if (pha_psw_stm_entry->buffered_port_type == hyInterface_ETH) {
-		pha_psw_stm_entry->q_max_len = br->path_switch_param.eth_q_max_len;
-		pha_psw_stm_entry->max_jiffies_diff =
-				br->path_switch_param.eth_max_jiffies_diff;
-	}
-
-	spin_unlock(&br->lock);
-
-}
-
 void hyfi_psw_stm_init(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha)
 {
 	struct ha_psw_stm_entry *pha_psw_stm_entry;
@@ -231,246 +139,7 @@ void hyfi_psw_stm_init(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha)
 	TAILQ_INIT(&pha_psw_stm_entry->skb_track_q);
 	spin_lock_init(&pha_psw_stm_entry->track_q_lock);
 
-	TAILQ_INIT(&pha_psw_stm_entry->skb_throt_q);
-	spin_lock_init(&pha_psw_stm_entry->throt_q_lock);
-
 	pha_psw_stm_entry->buffered_port_type = hyfi_portgrp_num(hyfi_bridge_get_port(ha->dst));
-
-	ha->flags &= ~HYFI_HACTIVE_TBL_SEAMLESS_ENABLED;
-
-	hyfi_psw_stm_track_param_update(br, pha_psw_stm_entry);
-}
-
-void hyfi_psw_pkt_track(struct sk_buff *skb, struct net_hatbl_entry *ha,
-		hyfi_ath_pkt_path_type pkt_path)
-{
-	struct hyfi_skb_track_q *skb_track_q;
-	struct hyfi_skb_track *hyfi_skb_track;
-	struct ha_psw_stm_entry *pha_psw_stm_entry = &ha->psw_stm_entry;
-
-	if (IS_IFACE_THROTTLED( ha )) {
-		return;
-	}
-
-	spin_lock(&pha_psw_stm_entry->track_q_lock);
-
-	skb_track_q = &pha_psw_stm_entry->skb_track_q;
-
-	if ((pha_psw_stm_entry->buffered_port_type == hyInterface_WIFI_2G)
-			|| (pha_psw_stm_entry->buffered_port_type == hyInterface_WIFI_5G)) {
-		// Walk through the skb track queue to release the buffer
-		do {
-
-			hyfi_skb_track = TAILQ_FIRST( skb_track_q );
-
-			if (hyfi_skb_track == NULL )
-				break;
-
-			// The transmit status information is not used. The packet is removed when driver release it
-			if ((pha_psw_stm_entry->q_len >= pha_psw_stm_entry->q_max_len)
-					|| (jiffies - hyfi_skb_track->jiffies
-							>= pha_psw_stm_entry->max_jiffies_diff)) {
-
-				TAILQ_REMOVE( skb_track_q, hyfi_skb_track, skb_track_qelem);
-				pha_psw_stm_entry->q_len--;
-				pha_psw_stm_entry->rmv_pkts++;
-				hyfi_psw_read_idx(hyfi_skb_track->skb, pha_psw_stm_entry);
-				kfree_skb(hyfi_skb_track->skb);
-			} else
-				break;
-
-		} while (1);
-		hyfi_skb_track = (struct hyfi_skb_track *) skb->head;
-
-		pha_psw_stm_entry->q_len++;
-
-		DEBUG_TRACE("Hash 0x%x, DA %02x:%02x:%02x:%02x:%02x:%02x: Warning: Increment "
-			"of skb->users is not supported, may cause future crash\n",
-			ha->hash, ha->da.addr[0], ha->da.addr[1], ha->da.addr[2],
-			ha->da.addr[3], ha->da.addr[4], ha->da.addr[5]);
-		atomic_inc(&skb->users);
-
-		hyfi_skb_track->network_header = skb->data - skb->head;
-		hyfi_skb_track->l3_pkt_len = skb->len;
-
-		hyfi_skb_track->protocol = skb->protocol;
-
-		if (skb->protocol == htons(ETH_P_8021Q)) {
-			memcpy(&hyfi_skb_track->pheader_8023, skb_mac_header(skb),
-					VLAN_ETH_HLEN);
-		} else {
-			memcpy(&hyfi_skb_track->pheader_8023, skb_mac_header(skb),
-					ETH_HLEN);
-		}
-
-		hyfi_skb_track->jiffies = jiffies;
-		hyfi_skb_track->skb = skb;
-		hyfi_skb_track->hyfi_pkt_path = pkt_path;
-		TAILQ_INSERT_TAIL( skb_track_q, hyfi_skb_track, skb_track_qelem);
-	} else if ((pha_psw_stm_entry->buffered_port_type == hyInterface_HPAV)
-			|| (pha_psw_stm_entry->buffered_port_type == hyInterface_ETH)) {
-		do {
-
-			hyfi_skb_track = TAILQ_FIRST( skb_track_q );
-
-			if (hyfi_skb_track == NULL ) {
-				pha_psw_stm_entry->q_len = 0;
-				break;
-			}
-
-			if ((pha_psw_stm_entry->q_len >= pha_psw_stm_entry->q_max_len)
-					|| ((jiffies - hyfi_skb_track->jiffies)
-							>= pha_psw_stm_entry->max_jiffies_diff)
-					|| ((pha_psw_stm_entry->buffered_port_type
-							== hyInterface_ETH) && (atomic_read(
-							&( hyfi_skb_track->skb->users ) ) == 1))) {
-				TAILQ_REMOVE( skb_track_q, hyfi_skb_track, skb_track_qelem);
-
-				pha_psw_stm_entry->q_len--;
-				pha_psw_stm_entry->rmv_pkts++;
-				hyfi_psw_read_idx(hyfi_skb_track->skb, pha_psw_stm_entry);
-				kfree_skb(hyfi_skb_track->skb); // kfree_skb takes care of skb->users
-			} else
-				break;
-		} while (1);
-
-		DEBUG_TRACE("Hash 0x%x, DA %02x:%02x:%02x:%02x:%02x:%02x: Warning: Increment "
-			"of skb->users is not supported, may cause future crash\n",
-			ha->hash, ha->da.addr[0], ha->da.addr[1], ha->da.addr[2],
-			ha->da.addr[3], ha->da.addr[4], ha->da.addr[5]);
-		atomic_inc(&skb->users);
-
-		hyfi_skb_track = (struct hyfi_skb_track *) skb->head;
-
-		hyfi_skb_track->jiffies = jiffies;
-		pha_psw_stm_entry->q_len++;
-
-		hyfi_skb_track->network_header = skb->data - skb->head;
-		hyfi_skb_track->l3_pkt_len = skb->len;
-
-		hyfi_skb_track->protocol = skb->protocol;
-
-		if (skb->protocol == htons(ETH_P_8021Q)) {
-			memcpy(&hyfi_skb_track->pheader_8023, skb_mac_header(skb),
-					VLAN_ETH_HLEN);
-		} else {
-			memcpy(&hyfi_skb_track->pheader_8023, skb_mac_header(skb),
-					ETH_HLEN);
-		}
-
-		hyfi_skb_track->skb = skb;
-		hyfi_skb_track->hyfi_pkt_path = pkt_path;
-		TAILQ_INSERT_TAIL( skb_track_q, hyfi_skb_track, skb_track_qelem);
-	} else {
-		DEBUG_WARN("%s Invalid buffered port %d\n",
-				__func__, pha_psw_stm_entry->buffered_port_type);
-	}
-
-	spin_unlock(&pha_psw_stm_entry->track_q_lock);
-}
-
-void path_switch_handle(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
-		struct net_bridge_port *dst, struct __hatbl_entry *hae)
-{
-	struct hyfi_skb_track_q *skb_track_q;
-	struct hyfi_skb_track *hyfi_skb_track;
-	struct ha_psw_stm_entry *pha_psw_stm_entry;
-
-	pha_psw_stm_entry = &ha->psw_stm_entry;
-	skb_track_q = &pha_psw_stm_entry->skb_track_q;
-
-	DEBUG_TRACE("%s: Global tracking: %d, Flow: 0x%x port: %d, enable: %d, use: %d\n",
-			__func__, br->path_switch_param.enable_path_switch, ha->hash, pha_psw_stm_entry->buffered_port_type, hae->psw_enable, hae->psw_use);
-
-	if (br->path_switch_param.enable_path_switch && hae->psw_enable) {
-		// per stream path switch is enabled
-		ha->flags |= HYFI_HACTIVE_TBL_SEAMLESS_ENABLED;
-	} else {
-		// per stream path switch is disabled
-		if (ha->flags & HYFI_HACTIVE_TBL_SEAMLESS_ENABLED) {
-
-			spin_lock_bh(&pha_psw_stm_entry->track_q_lock);
-			hyfi_skb_track = TAILQ_FIRST( skb_track_q );
-
-			// stream from enable to disable. Clean the tracking queue
-			while (hyfi_skb_track) {
-				TAILQ_REMOVE( skb_track_q, hyfi_skb_track, skb_track_qelem);
-				kfree_skb(hyfi_skb_track->skb);
-				hyfi_skb_track = TAILQ_FIRST( skb_track_q );
-			}
-
-			spin_unlock_bh(&pha_psw_stm_entry->track_q_lock);
-			pha_psw_stm_entry->q_len = 0;
-		}
-		ha->flags &= ~HYFI_HACTIVE_TBL_SEAMLESS_ENABLED;
-		return;
-	}
-
-	ha->dst = dst;
-
-	if (hae->psw_use
-			&& (pha_psw_stm_entry->buffered_port_type
-					!= hyfi_portgrp_num(hyfi_bridge_get_port(dst)))) {
-
-		DEBUG_TRACE("%s: Switching flow 0x%2x from port %d to port %d, duplicate packets: %d\n",
-				__func__, ha->hash, pha_psw_stm_entry->buffered_port_type,
-				hyfi_portgrp_num(hyfi_bridge_get_port(dst)), pha_psw_stm_entry->q_len);
-
-		rcu_read_lock();
-		hyfi_psw_send_pkt(br, ha, HYFI_PSW_PKT_1, 0);
-		rcu_read_unlock();
-
-		if (pha_psw_stm_entry->q_len) {
-			struct hyfi_skb_track_q *skb_throt_q;
-
-			spin_lock_bh(&pha_psw_stm_entry->track_q_lock);
-			skb_throt_q = &pha_psw_stm_entry->skb_throt_q;
-			hyfi_skb_track = TAILQ_FIRST( skb_track_q );
-
-			while (hyfi_skb_track) {
-				TAILQ_REMOVE( skb_track_q, hyfi_skb_track, skb_track_qelem);
-				TAILQ_INSERT_TAIL( skb_throt_q, hyfi_skb_track,
-						skb_track_qelem);
-				hyfi_skb_track = TAILQ_FIRST( skb_track_q );
-			}
-
-			pha_psw_stm_entry->throt_q_len = pha_psw_stm_entry->q_len;
-			pha_psw_stm_entry->throt_q_dup_buf_len = pha_psw_stm_entry->q_len;
-			pha_psw_stm_entry->throt_buffered_port_type =
-					pha_psw_stm_entry->buffered_port_type;
-
-			pha_psw_stm_entry->dup_pkt_cnt = 0;
-			pha_psw_stm_entry->q_len = 0;
-
-			spin_unlock_bh(&pha_psw_stm_entry->track_q_lock);
-		} else {
-			rcu_read_lock();
-			hyfi_psw_send_pkt(br, ha, HYFI_PSW_PKT_2, 0);
-			rcu_read_unlock();
-		}
-	} else {
-		DEBUG_TRACE("%s: Freeing %d duplicate packets from flow 0x%2x\n",
-				__func__, pha_psw_stm_entry->q_len, ha->hash);
-
-		spin_lock_bh(&pha_psw_stm_entry->track_q_lock);
-
-		// tracked packet is not used to forward to a new interface.
-		hyfi_skb_track = TAILQ_FIRST( skb_track_q );
-
-		while (hyfi_skb_track) {
-			TAILQ_REMOVE( skb_track_q, hyfi_skb_track, skb_track_qelem);
-			kfree_skb(hyfi_skb_track->skb);
-			hyfi_skb_track = TAILQ_FIRST( skb_track_q );
-		}
-
-		spin_unlock_bh(&pha_psw_stm_entry->track_q_lock);
-	}
-
-	pha_psw_stm_entry->q_len = 0;
-	pha_psw_stm_entry->rmv_pkts = 0;
-	pha_psw_stm_entry->last_idx = pha_psw_stm_entry->idx;
-	pha_psw_stm_entry->buffered_port_type = hyfi_portgrp_num(hyfi_bridge_get_port(dst));
-	hyfi_psw_stm_track_param_update(br, pha_psw_stm_entry);
 }
 
 void hyfi_psw_flush_track_q(struct ha_psw_stm_entry *pha_psw_stm_entry)
@@ -491,7 +160,6 @@ void hyfi_psw_flush_track_q(struct ha_psw_stm_entry *pha_psw_stm_entry)
 		hyfi_skb_track = TAILQ_FIRST( skb_track_q );
 	}
 
-	pha_psw_stm_entry->q_len = 0;
 	spin_unlock_bh(&pha_psw_stm_entry->track_q_lock);
 	DEBUG_WARN("%s[%d] flushed packet=%d\n",
 			__func__, __LINE__, flush_pkt_cnt);
@@ -559,39 +227,11 @@ void hyfi_psw_send_pkt(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
 	pkt->field10 = ha->priority;
 
 	switch (pkt_value) {
-	case HYFI_PSW_PKT_1:
-		pkt->field11[0] = 0x36;
-		pkt->field11[1] = 0x04;
-		pkt->field12 = htons(ha->psw_stm_entry.last_idx);
-
-		pkt->field13[0] = 0x37;
-		pkt->field13[1] = 0x04;
-		pkt->field14 = htons(ha->psw_stm_entry.rmv_pkts);
-		pkt->field15[0] = 0xff;
-		pkt->field15[1] = 0x02;
-		break;
-
-	case HYFI_PSW_PKT_2:
-		pkt->field11[0] = 0x34;
-		pkt->field11[1] = 0x04;
-		pkt->field12 = htons(dpkt);
-		pkt->field13[0] = 0xff;
-		pkt->field13[1] = 0x02;
-		break;
-
 	case HYFI_PSW_PKT_3:
 	case HYFI_PSW_PKT_4:
 		pkt->field11[0] = 0x36;
 		pkt->field11[1] = 0x04;
 		pkt->field12 = htons(ha->psw_stm_entry.mrk_id);
-		pkt->field13[0] = 0xff;
-		pkt->field13[1] = 0x02;
-		break;
-
-	case HYFI_PSW_PKT_5:
-		pkt->field11[0] = 0x35;
-		pkt->field11[1] = 0x04;
-		pkt->field12 = htons(ha->psw_stm_entry.idx++);
 		pkt->field13[0] = 0xff;
 		pkt->field13[1] = 0x02;
 		break;
@@ -607,15 +247,7 @@ void hyfi_psw_send_pkt(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
 
 	skb->dev = br->dev;
 
-	if (pkt_value == HYFI_PSW_PKT_5) {
-		hyfi_psw_pkt_track(skb, ha, HYFI_DELIVER_PKT);
-	}
-
-	if (IS_IFACE_THROTTLED( ha ) && (pkt_value != HYFI_PSW_PKT_2)) {
-		hyfi_psw_throttle(br, ha, &skb, HYFI_DELIVER_PKT);
-	} else {
-		br_deliver(ha->dst, skb);
-	}
+	br_deliver(ha->dst, skb);
 }
 
 static int hyfi_psw_recv_pkt(psw_pkt_type type, struct psw_pkt *pkt,
@@ -628,32 +260,16 @@ static int hyfi_psw_recv_pkt(psw_pkt_type type, struct psw_pkt *pkt,
 	*da = pkt->field8;
 	*sub_class = pkt->field9;
 
-	if (type == HYFI_PSW_PKT_1) {
-		*freed_pkt = pkt->field14;
-	}
-
 	return 0;
 }
 
 static psw_pkt_type hyfi_psw_detect_pkt(struct psw_pkt *psw_pkt)
 {
 	switch (psw_pkt->field5) {
-	case HYFI_PSW_PKT_1:
-		if (psw_pkt->field11[0] == 0x36 && psw_pkt->field13[0] == 0x37)
-			return HYFI_PSW_PKT_1;
-
-	case HYFI_PSW_PKT_2:
-		if (psw_pkt->field11[0] == 0x34 && psw_pkt->field13[0] == 0xff)
-			return HYFI_PSW_PKT_2;
-
 	case HYFI_PSW_PKT_3:
 	case HYFI_PSW_PKT_4:
 		if (psw_pkt->field11[0] == 0x36 && psw_pkt->field13[0] == 0xff)
 			return psw_pkt->field5;
-
-	case HYFI_PSW_PKT_5:
-		if (psw_pkt->field11[0] == 0x35 && psw_pkt->field11[1] == 0x04)
-			return HYFI_PSW_PKT_5;
 
 	default:
 		return HYFI_PSW_PKT_UNKNOWN;
@@ -703,99 +319,6 @@ static int hyfi_psw_forward_and_queue(struct net_hatbl_entry *ha,
 		ha->psw_info.old_if_jiffies = 0;
 	}
 
-	return 0;
-}
-
-static int hyfi_psw_handle_pkt1(struct psw_pkt *psw_pkt,
-		struct hyfi_net_bridge *br, u_int32_t ifindex)
-{
-	int32_t ret = -1;
-	struct net_hatbl_entry *ha = NULL;
-	u_int32_t hash, priority, sub_class;
-	u_int16_t last_idx, freed_pkt;
-	const unsigned char *da;
-
-	/* duplication elimination */
-	ret = hyfi_psw_recv_pkt(HYFI_PSW_PKT_1, psw_pkt, &hash, &last_idx,
-			&priority, &da, &sub_class, &freed_pkt);
-
-	if (ret < 0)
-		return 0;
-
-	ha = hyfi_hatbl_find_tracked_entry(br, hash, da, sub_class, priority);
-
-	if (!ha)
-		return 0;
-
-	DEBUG_TRACE("Buffer begin marker packet: packets: %d, last index = %d\n",
-			freed_pkt, last_idx);
-
-	spin_lock(&ha->psw_info.buf_q_lock);
-
-	if (ha->psw_info.dup_pkt || ha->psw_info.wait_idx >= 0) {
-		spin_unlock(&ha->psw_info.buf_q_lock);
-		DEBUG_TRACE("Duplicate buffer begin marker detected!\n");
-		return 0;
-	}
-
-	DEBUG_TRACE("It=%d, Ir=%d, ha->psw_info.pkt_cnt = %d, freed_pkt = %d, ha->psw_info.wait_idx = %d\n",
-			last_idx, ha->psw_info.last_idx, ha->psw_info.pkt_cnt, freed_pkt, ha->psw_info.wait_idx);
-
-	ha->psw_info.mse_rcv = ha->psw_info.msb_rcv = 0;
-
-	if (ha->psw_info.last_idx == last_idx) {
-		if (freed_pkt < ha->psw_info.pkt_cnt) {
-			ha->psw_info.dup_pkt = ha->psw_info.pkt_cnt - freed_pkt;
-			ha->psw_info.wait_idx = -1;
-			DEBUG_TRACE("It==Ir, ha=%p, ha->psw_info.dup_pkt = %d, ha->psw_info.pkt_cnt = %d, freed_pkt = %d\n",
-					ha, ha->psw_info.dup_pkt, ha->psw_info.pkt_cnt, freed_pkt);
-		}
-	} else {
-		u_int16_t d = ha->psw_info.last_idx - last_idx;
-
-		if (d < (1 << 8)) {
-			ha->psw_info.wait_idx = ha->psw_info.last_idx;
-			ha->psw_info.dup_pkt = ha->psw_info.pkt_cnt;
-			DEBUG_TRACE("It<Ir, ha=%p, It=%d, Ir=%d, ha->psw_info.dup_pkt = %d, ha->psw_info.pkt_cnt = %d, freed_pkt = %d, ha->psw_info.wait_idx = %d\n",
-					ha, last_idx, ha->psw_info.last_idx, ha->psw_info.dup_pkt, ha->psw_info.pkt_cnt, freed_pkt, ha->psw_info.wait_idx);
-		}
-	}
-
-	if (ha->psw_info.dup_pkt)
-		ha->psw_info.dup_pkt--; //?
-
-	ha->psw_info.mbb_dev_idx = ifindex;
-
-	spin_unlock(&ha->psw_info.buf_q_lock);
-	return 0;
-}
-
-static int hyfi_psw_handle_pkt2(struct psw_pkt *psw_pkt,
-		struct hyfi_net_bridge *br)
-{
-	int32_t ret = -1;
-	struct net_hatbl_entry *ha = NULL;
-	u_int32_t hash, priority, sub_class;
-	u_int16_t last_idx, freed_pkt;
-	const unsigned char *da;
-
-	ret = hyfi_psw_recv_pkt(HYFI_PSW_PKT_2, psw_pkt, &hash, &last_idx,
-			&priority, &da, &sub_class, &freed_pkt);
-
-	if (ret < 0)
-		return 0;
-
-	ha = hyfi_hatbl_find_tracked_entry(br, hash, da, sub_class, priority);
-
-	if (!ha)
-		return 0;
-
-	DEBUG_TRACE("Buffer end marker packet\n");
-
-	spin_lock(&ha->psw_info.buf_q_lock);
-
-	ha->psw_info.mbb_dev_idx = 0;
-	spin_unlock(&ha->psw_info.buf_q_lock);
 	return 0;
 }
 
@@ -927,61 +450,6 @@ static int hyfi_psw_handle_pkt4(struct psw_pkt *psw_pkt,
 	return 0;
 }
 
-static int hyfi_psw_handle_pkt5(struct psw_pkt *psw_pkt,
-		struct hyfi_net_bridge *br, u_int32_t ifindex)
-{
-	int32_t ret = -1;
-	struct net_hatbl_entry *ha = NULL;
-	u_int32_t hash, priority, sub_class;
-	u_int16_t last_idx;
-	const unsigned char *da;
-
-	ret = hyfi_psw_recv_pkt(HYFI_PSW_PKT_5, psw_pkt, &hash, &last_idx,
-			&priority, &da, &sub_class, NULL );
-
-	if (ret < 0)
-		return 0;
-
-	spin_lock(&br->hash_ha_lock);
-
-	ha = hyfi_hatbl_find_tracked_entry(br, hash, da, sub_class, priority);
-
-	if (!ha) {
-		ha = hyfi_hatbl_create_tracked_entry(br, hash, psw_pkt->h_source, da,
-				sub_class, priority);
-
-		if (!ha) {
-			spin_unlock(&br->hash_ha_lock);
-			return 0;
-		}
-	}
-
-	spin_unlock(&br->hash_ha_lock);
-	spin_lock(&ha->psw_info.buf_q_lock);
-
-	if (ha->psw_info.mbb_dev_idx && ha->psw_info.mbb_dev_idx != ifindex) {
-		spin_unlock(&ha->psw_info.buf_q_lock);
-		return 0;
-	}
-
-	DEBUG_TRACE("Marker packet: counted %d packets, index = %d\n",
-			ha->psw_info.pkt_cnt, last_idx);
-	ha->psw_info.pkt_cnt = 0;
-	ha->psw_info.last_idx = last_idx;
-	if (ha->psw_info.wait_idx > 0) {
-		if (ha->psw_info.last_idx == ha->psw_info.wait_idx) {
-			ha->psw_info.wait_idx = -1;
-		} else if (((ha->psw_info.last_idx > ha->psw_info.wait_idx)
-				&& (ha->psw_info.last_idx - ha->psw_info.wait_idx < 1024))) {
-			ha->psw_info.wait_idx = -1;
-			ha->psw_info.dup_pkt = 0;
-		}
-	}
-
-	spin_unlock(&ha->psw_info.buf_q_lock);
-	return 0;
-}
-
 int hyfi_psw_process_pkt(struct net_hatbl_entry *ha, struct sk_buff **skb,
 		const struct hyfi_net_bridge *br)
 {
@@ -1091,13 +559,6 @@ int hyfi_psw_process_hyfi_pkt(struct hyfi_net_bridge *br, struct sk_buff *skb,
 	pkt_type = hyfi_psw_detect_pkt(psw_pkt);
 
 	switch (pkt_type) {
-	case HYFI_PSW_PKT_1:
-		hyfi_psw_handle_pkt1(psw_pkt, br, skb->dev->ifindex);
-		break;
-
-	case HYFI_PSW_PKT_2:
-		hyfi_psw_handle_pkt2(psw_pkt, br);
-		break;
 
 	case HYFI_PSW_PKT_3:
 		hyfi_psw_handle_pkt3(psw_pkt, br);
@@ -1105,10 +566,6 @@ int hyfi_psw_process_hyfi_pkt(struct hyfi_net_bridge *br, struct sk_buff *skb,
 
 	case HYFI_PSW_PKT_4:
 		hyfi_psw_handle_pkt4(psw_pkt, br, skb);
-		break;
-
-	case HYFI_PSW_PKT_5:
-		hyfi_psw_handle_pkt5(psw_pkt, br, skb->dev->ifindex);
 		break;
 
 	default:
@@ -1140,38 +597,11 @@ int hyfi_psw_flush_buf_q(struct net_hatbl_entry *ha)
 	return 0;
 }
 
-int hyfi_psw_flush_throt_q(struct net_hatbl_entry *ha)
-{
-	struct ha_psw_stm_entry *pha_psw_stm_entry = &ha->psw_stm_entry;
-	struct hyfi_skb_track_q *skb_throt_q;
-	struct hyfi_skb_track *hyfi_skb_track;
-
-	spin_lock_bh(&pha_psw_stm_entry->throt_q_lock);
-
-	if (unlikely(pha_psw_stm_entry->throt_q_len)) {
-		skb_throt_q = &pha_psw_stm_entry->skb_throt_q;
-		hyfi_skb_track = TAILQ_FIRST( skb_throt_q );
-
-		while (hyfi_skb_track) {
-			TAILQ_REMOVE( skb_throt_q, hyfi_skb_track, skb_track_qelem);
-			kfree_skb(hyfi_skb_track->skb);
-			hyfi_skb_track = TAILQ_FIRST( skb_throt_q );
-		}
-
-		pha_psw_stm_entry->throt_q_len = 0;
-		pha_psw_stm_entry->throt_q_dup_buf_len = 0;
-	}
-
-	spin_unlock_bh(&pha_psw_stm_entry->throt_q_lock);
-	return 0;
-}
-
 int hyfi_psw_init_entry(struct net_hatbl_entry *ha)
 {
 	memset(&ha->psw_info, 0, sizeof(struct psw_flow_info));
 	ha->psw_info.wait_idx = -1;
 	ha->psw_info.last_mrk_id = ~0;
-	ha->psw_info.buf_size = HYFI_PSW_DEF_REORD_BUF;
 
 	TAILQ_INIT(&ha->psw_info.skb_buf_q);
 	spin_lock_init(&ha->psw_info.buf_q_lock);
@@ -1179,113 +609,3 @@ int hyfi_psw_init_entry(struct net_hatbl_entry *ha)
 	return 0;
 }
 
-int hyfi_psw_throttle(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
-		struct sk_buff **skb, hyfi_ath_pkt_path_type pkt_path)
-{
-	struct hyfi_skb_track_q *skb_throt_q;
-	struct hyfi_skb_track *hyfi_skb_track;
-	struct ha_psw_stm_entry *pha_psw_stm_entry;
-	u_int32_t quota = HYFI_PSW_DUP_BUF_FLUSH_QUOTA;
-
-	ha->num_packets--;
-	ha->num_bytes -= (*skb)->len;
-
-	pha_psw_stm_entry = &ha->psw_stm_entry;
-
-	spin_lock(&pha_psw_stm_entry->throt_q_lock);
-	skb_throt_q = &pha_psw_stm_entry->skb_throt_q;
-
-	hyfi_skb_track = TAILQ_FIRST( skb_throt_q );
-
-	// Walk through the skb track queue, restore the 802.3 header and forward the packet to new interface
-	while (hyfi_skb_track && quota--) {
-		struct sk_buff *dup_skb;
-
-		if (pha_psw_stm_entry->throt_q_dup_buf_len) {
-			dup_skb = skb_copy(hyfi_skb_track->skb, GFP_ATOMIC);
-
-			if (!dup_skb) {
-				/* Out of memory, flush queue */
-				while (hyfi_skb_track) {
-					TAILQ_REMOVE(skb_throt_q, hyfi_skb_track, skb_track_qelem);
-					kfree_skb(hyfi_skb_track->skb);
-					hyfi_skb_track = TAILQ_FIRST( skb_throt_q );
-				}
-
-				pha_psw_stm_entry->throt_q_len = 0;
-				pha_psw_stm_entry->throt_q_dup_buf_len = 0;
-				break;
-			}
-
-			TAILQ_REMOVE(skb_throt_q, hyfi_skb_track, skb_track_qelem);
-			kfree_skb(hyfi_skb_track->skb);
-
-			hyfi_skb_track = (struct hyfi_skb_track *) dup_skb->head;
-			dup_skb->data = dup_skb->head + hyfi_skb_track->network_header;
-			dup_skb->len = hyfi_skb_track->l3_pkt_len;
-			dup_skb->protocol = hyfi_skb_track->protocol;
-
-			if (dup_skb->protocol == htons(ETH_P_8021Q)) {
-				skb_push(dup_skb, VLAN_ETH_HLEN);
-				memmove(dup_skb->data, &hyfi_skb_track->pheader_8023,
-						VLAN_ETH_HLEN);
-			} else {
-				skb_push(dup_skb, ETH_HLEN);
-				memmove(dup_skb->data, &hyfi_skb_track->pheader_8023, ETH_HLEN);
-			}
-
-			skb_reset_mac_header(dup_skb);
-			skb_pull(dup_skb, ETH_HLEN);
-		} else {
-			dup_skb = hyfi_skb_track->skb;
-			TAILQ_REMOVE(skb_throt_q, hyfi_skb_track, skb_track_qelem);
-		}
-
-		ha->num_packets++;
-		ha->num_bytes += dup_skb->len;
-
-		if (hyfi_skb_track->hyfi_pkt_path == HYFI_FORWARD_PKT) {
-			hyfi_br_forward(ha->dst, dup_skb);
-		} else if (hyfi_skb_track->hyfi_pkt_path == HYFI_DELIVER_PKT) {
-			br_deliver(ha->dst, dup_skb);
-		}
-
-		if (pha_psw_stm_entry->throt_q_dup_buf_len) {
-			pha_psw_stm_entry->throt_q_dup_buf_len--;
-			pha_psw_stm_entry->dup_pkt_cnt++;
-
-			if (!pha_psw_stm_entry->throt_q_dup_buf_len) {
-				hyfi_psw_send_pkt(br, ha, HYFI_PSW_PKT_2,
-						pha_psw_stm_entry->dup_pkt_cnt);
-				pha_psw_stm_entry->dup_pkt_cnt = 0;
-			}
-		}
-
-		hyfi_skb_track = TAILQ_FIRST( skb_throt_q );
-		pha_psw_stm_entry->throt_q_len--;
-	}
-
-	if (hyfi_skb_track) {
-		struct sk_buff *pskb = *skb;
-
-		hyfi_skb_track = (struct hyfi_skb_track *) pskb->head;
-		hyfi_skb_track->skb = pskb;
-		hyfi_skb_track->hyfi_pkt_path = pkt_path;
-		TAILQ_INSERT_TAIL(skb_throt_q, hyfi_skb_track, skb_track_qelem);
-		pha_psw_stm_entry->throt_q_len++;
-		*skb = NULL;
-
-		spin_unlock(&pha_psw_stm_entry->throt_q_lock);
-		return 1;
-	} else {
-		pha_psw_stm_entry->throt_q_len = 0;
-		pha_psw_stm_entry->throt_q_dup_buf_len = 0;
-		pha_psw_stm_entry->dup_pkt_cnt = 0;
-
-		ha->num_packets++;
-		ha->num_bytes += (*skb)->len;
-	}
-
-	spin_unlock(&pha_psw_stm_entry->throt_q_lock);
-	return 0;
-}

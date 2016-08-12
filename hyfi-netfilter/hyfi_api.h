@@ -253,9 +253,7 @@ struct __hatbl_entry {
 	u_int32_t priority;
 	u_int32_t action :3; /* drop, throttle */
 	u_int32_t local :1; /* not created from HD */
-	u_int32_t psw_enable :1; /*Enable per stream path switch */
 	u_int32_t static_entry :1;
-	u_int32_t psw_use :1; /* Forward tracked packet to new interface */
 	u_int32_t aggr_entry :1; /* Aggregated entry */
 	u_int32_t accl_entry :1; /* Accelerated entry */
 
@@ -264,15 +262,6 @@ struct __hatbl_entry {
 };
 
 struct __path_switch_param {
-	u_int32_t enable_path_switch;
-	u_int32_t wifi_2_q_max_len;
-	u_int32_t wifi_2_tracking_time;
-	u_int32_t wifi_5_q_max_len;
-	u_int32_t wifi_5_tracking_time;
-	u_int32_t plc_q_max_len;
-	u_int32_t plc_tracking_time;
-	u_int32_t eth_q_max_len;
-	u_int32_t eth_tracking_time;
 	u_int32_t enable_switch_markers;
 };
 
