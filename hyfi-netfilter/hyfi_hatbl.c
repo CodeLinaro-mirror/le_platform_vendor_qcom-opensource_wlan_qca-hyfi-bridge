@@ -43,9 +43,7 @@ static struct kmem_cache *hyfi_hatbl_cache __read_mostly;
 static inline int has_expired(const struct hyfi_net_bridge *br,
 		const struct net_hatbl_entry *ha)
 {
-	return time_before_eq(
-			ha->last_access + msecs_to_jiffies(HYFI_HACTIVE_TBL_EXPIRE_TIME),
-			jiffies);
+	return time_before_eq((unsigned long)(ha->last_access + br->hatbl_aging_time), jiffies);
 }
 
 static void hatbl_rcu_free(struct rcu_head *head)
@@ -77,7 +75,7 @@ void hyfi_hatbl_cleanup(unsigned long _data)
 	u_int32_t i, aging = 0;
 	struct hyfi_net_bridge *br = (struct hyfi_net_bridge *) _data;
 	unsigned long this_timer, next_timer = jiffies
-			+ msecs_to_jiffies(HYFI_HACTIVE_TBL_AGING_TIME);
+		+ msecs_to_jiffies(HYFI_HACTIVE_TBL_AGING_TIME);
 
 	spin_lock_bh(&br->hash_ha_lock);
 	for (i = 0; i < HA_HASH_SIZE; i++) {
@@ -85,8 +83,7 @@ void hyfi_hatbl_cleanup(unsigned long _data)
 		struct hlist_node *h, *n;
 
 		os_hlist_for_each_entry_safe(ha, h, n, &br->hash_ha[i], hlist)	{
-			this_timer = ha->last_access
-					+ msecs_to_jiffies(br->hatbl_aging_time);
+			this_timer = ha->last_access + br->hatbl_aging_time;
 			if (time_before_eq(this_timer, jiffies)) {
 				hatbl_delete(br, ha);
 				aging++;
@@ -783,7 +780,7 @@ void hyfi_hatbl_update_mcast_stats(struct net_bridge *br, struct sk_buff *skb,
 static void hyfi_hatbl_timer_init(struct hyfi_net_bridge *br)
 {
 	setup_timer(&br->hatbl_timer, hyfi_hatbl_cleanup, (unsigned long) br);
-	mod_timer(&br->hatbl_timer, jiffies + HYFI_HACTIVE_TBL_AGING_TIME);
+	mod_timer(&br->hatbl_timer, jiffies + msecs_to_jiffies(HYFI_HACTIVE_TBL_AGING_TIME));
 }
 
 int __init hyfi_hatbl_init(struct hyfi_net_bridge *br)
@@ -796,7 +793,7 @@ int __init hyfi_hatbl_init(struct hyfi_net_bridge *br)
 	if (!hyfi_hatbl_cache)
 		return -ENOMEM;
 
-	br->hatbl_aging_time = HYFI_HACTIVE_TBL_EXPIRE_TIME;
+	br->hatbl_aging_time = msecs_to_jiffies(HYFI_HACTIVE_TBL_EXPIRE_TIME);
 	hyfi_hatbl_timer_init(br);
 
 	return 0;

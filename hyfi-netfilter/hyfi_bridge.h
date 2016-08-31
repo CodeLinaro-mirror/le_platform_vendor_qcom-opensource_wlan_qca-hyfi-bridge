@@ -40,6 +40,9 @@ struct hyfi_net_bridge {
 	struct hlist_head hash_hd[HD_HASH_SIZE];
 
 	u_int32_t flags;
+
+	// Maximum age of a H-Active entry before it should be aged out
+	// (in jiffies)
 	u_int32_t hatbl_aging_time;
 	struct timer_list hatbl_timer;
 	u_int32_t ha_entry_cnt;
@@ -72,7 +75,7 @@ struct hyfi_net_bridge_port * hyfi_bridge_get_port_by_dev(const struct net_devic
 /**
  * @brief Get the Hy-Fi bridge device.  This protects us during
  *        operations where Hy-Fi may be detached asynchronously.
- * 
+ *
  * @pre Must be called with rcu_read_lock
  *
  * @return Pointer to hyfi_br.dev if bridge is attached, NULL

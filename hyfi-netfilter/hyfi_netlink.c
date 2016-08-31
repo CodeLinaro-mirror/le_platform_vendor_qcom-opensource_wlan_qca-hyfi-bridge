@@ -277,8 +277,14 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 
 			case HYFI_SET_HATBL_AGING_PARAM: {
 				struct __aging_param *p = hymsgdata;
+				if (!p->aging_time || p->aging_time > HYFI_HACTIVE_TBL_EXPIRE_TIME)
+				{
+					// Invalid max age
+					hymsghdr->status = HYFI_STATUS_INVALID_PARAMETER;
+					break;
+				}
 				spin_lock_bh(&br->lock);
-				br->hatbl_aging_time = p->aging_time;
+				br->hatbl_aging_time = msecs_to_jiffies(p->aging_time);
 				spin_unlock_bh(&br->lock);
 
 				break;
