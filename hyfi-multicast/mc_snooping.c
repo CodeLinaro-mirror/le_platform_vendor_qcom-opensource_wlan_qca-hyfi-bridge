@@ -2237,9 +2237,8 @@ out:
  *  Called with rcu 
  *  maybe called by timer or ioctl 
  */
-void mc_fdb_change(__u8 *mac, int event)
+void mc_fdb_change(struct hyfi_net_bridge *hyfi_br, __u8 *mac, int event)
 {
-    struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get(HYFI_BRIDGE_ME);
     struct mc_struct *mc = MC_DEV(hyfi_br);
     int i;
 
@@ -2295,19 +2294,18 @@ void mc_fdb_change(__u8 *mac, int event)
  *  Called with rcu 
  *  maybe called by timer or ioctl 
  */
-void mc_nbp_change(struct net_bridge_port *p, int event)
+void mc_nbp_change(struct hyfi_net_bridge *hyfi_br,
+                  struct net_bridge_port *p, int event)
 {
     struct hlist_node *h;
     struct mc_querier_entry *qe;
     int delay_reset = 0;
-    struct hyfi_net_bridge *hyfi_br;
     struct mc_struct *mc;
     int i;
 
     if (!p)
     	return;
 
-    hyfi_br = hyfi_bridge_get(p->br);
     mc = MC_DEV(hyfi_br);
 
     if (!p->br || !mc || event != RTM_DELLINK)

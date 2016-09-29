@@ -28,7 +28,7 @@
 #endif
 
 #define HYFI_AGGR_REORD_FLUSH_QUOTA 2
-#define HYFI_BRIDGE_ME				(NULL)
+#define HYFI_BRIDGE_MAX 2 /* max number of hyfi bridges supported */
 
 struct hyfi_net_bridge {
 	spinlock_t lock;
@@ -54,6 +54,7 @@ struct hyfi_net_bridge {
 	struct list_head port_list;
 
 	struct net_device *dev;
+	char linux_bridge[IFNAMSIZ]; /* Linux bridge name */
 };
 
 struct hyfi_net_bridge_port {
@@ -69,7 +70,8 @@ struct hyfi_net_bridge_port {
 
 struct hyfi_net_bridge *hyfi_bridge_get(const struct net_bridge *br);
 struct hyfi_net_bridge *hyfi_bridge_get_by_dev(const struct net_device *dev);
-struct hyfi_net_bridge_port * hyfi_bridge_get_port(const struct net_bridge_port *p);
+struct hyfi_net_bridge *hyfi_bridge_get_by_port(const struct net_bridge_port *port);
+struct hyfi_net_bridge_port *hyfi_bridge_get_port(const struct net_bridge_port *p);
 struct hyfi_net_bridge_port * hyfi_bridge_get_port_by_dev(const struct net_device *dev);
 
 /**
@@ -128,14 +130,17 @@ static inline int hyfi_bridge_should_flood(const struct hyfi_net_bridge_port *hy
 	return 0;
 }
 
-int hyfi_bridge_dev_event(unsigned long event, struct net_device *dev);
-int hyfi_bridge_set_bridge_name(const char *br_name);
-int hyfi_bridge_init_port(struct net_bridge_port *p);
-int hyfi_bridge_delete_port(struct net_bridge_port *p);
+int hyfi_bridge_dev_event(struct hyfi_net_bridge *hyfi_br, unsigned long event,
+		struct net_device *dev);
+int hyfi_bridge_set_bridge_name(struct hyfi_net_bridge *hyfi_br, const char *br_name);
+int hyfi_bridge_init_port(struct hyfi_net_bridge *hyfi_br, struct net_bridge_port *p);
+int hyfi_bridge_delete_port(struct hyfi_net_bridge *hyfi_br, struct net_bridge_port *p);
 int hyfi_bridge_should_deliver(const struct hyfi_net_bridge_port *src,
 		const struct hyfi_net_bridge_port *dst, const struct sk_buff *skb);
 struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 		struct sk_buff **skb);
+struct hyfi_net_bridge * hyfi_bridge_get_hyfi_bridge(const char *br_name);
+struct hyfi_net_bridge * hyfi_bridge_alloc_hyfi_bridge(const char *br_name);
 
 int hyfi_bridge_init(void);
 

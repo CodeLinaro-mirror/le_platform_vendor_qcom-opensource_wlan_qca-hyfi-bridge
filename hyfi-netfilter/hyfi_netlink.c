@@ -34,7 +34,7 @@ static struct sock *hyfi_nl_event_sk = NULL;
 static void hyfi_netlink_receive(struct sk_buff *__skb)
 {
 	struct net_device *brdev = NULL;
-	struct hyfi_net_bridge *br = hyfi_bridge_get(HYFI_BRIDGE_ME);
+	struct hyfi_net_bridge *br;
 	struct net_device *bridge_dev = NULL;
 	struct sk_buff *skb;
 	struct nlmsghdr *nlh = NULL;
@@ -59,11 +59,20 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 		hymsgdata = HYFI_MSG_DATA(nlh);
 		msgtype = nlh->nlmsg_type;
 
+		brdev = dev_get_by_name(&init_net, hymsghdr->if_name);
+		if (!brdev) {
+			DEBUG_ERROR("Device not found: %s\n", hymsghdr->if_name);
+			hymsghdr->status = HYFI_STATUS_NOT_FOUND;
+			goto done;
+		}
+
+		br = hyfi_bridge_get(netdev_priv(brdev));
 		do {
 			if (msgtype == HYFI_ATTACH_BRIDGE ||
 				msgtype == HYFI_DETACH_BRIDGE ||
 				msgtype == HYFI_GET_BRIDGE) {
 				bool release_read_lock = false;
+				struct hyfi_net_bridge * hf_br = NULL;
 
 				if (br) {
 					rcu_read_lock();
@@ -80,8 +89,14 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 							release_read_lock = false;
 							rcu_read_unlock();
 						}
-						if (hyfi_bridge_set_bridge_name(hymsghdr->if_name)) {
-								DEBUG_ERROR("hyfi: failed to attach bridge %s\n",hymsghdr->if_name);
+						hf_br = hyfi_bridge_alloc_hyfi_bridge(hymsghdr->if_name);
+						if (hf_br == NULL) {
+							DEBUG_ERROR("hyfi: cannot support anymore hyfi bridges\n");
+							hymsghdr->status = HYFI_STATUS_FAILURE;
+							goto done;
+						}
+						if (hyfi_bridge_set_bridge_name(hf_br, hymsghdr->if_name)) {
+							DEBUG_ERROR("hyfi: failed to attach bridge %s\n",hymsghdr->if_name);
 							hymsghdr->status = HYFI_STATUS_FAILURE;
 						}
 					}
@@ -96,7 +111,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 							release_read_lock = false;
 							rcu_read_unlock();
 						}
-						if (hyfi_bridge_set_bridge_name(NULL )) {
+						if (hyfi_bridge_set_bridge_name(br, NULL )) {
 							hymsghdr->status = HYFI_STATUS_FAILURE;
 						}
 					}
@@ -120,7 +135,6 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				break;
 			}
 
-			brdev = dev_get_by_name(&init_net, hymsghdr->if_name);
 			if (!brdev || !br || brdev != br->dev) {
 				if (!(msgtype == HYFI_GET_FDB && brdev && (brdev->priv_flags & IFF_EBRIDGE))) {
 					DEBUG_ERROR("Not a Hy-Fi device, or device not found: %s\n",
@@ -306,7 +320,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				u_int32_t i = 0;
 
 				rcu_read_lock();
-				if (!list_empty(&br->port_list)) {
+				if (br && !list_empty(&br->port_list)) {
 					list_for_each_entry_rcu(p, &br->port_list, list)
 					{
 						if (i
@@ -475,10 +489,11 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 
 			} /* switch */
 
-			if (brdev)
-				dev_put(brdev);
-
 		} while (false);
+
+	done:
+		if (brdev)
+			dev_put(brdev);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0))
 		NETLINK_CB(skb).portid = 0; /* from kernel */
@@ -492,7 +507,8 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 	return;
 }
 
-void hyfi_netlink_event_send(u32 event_type, u32 event_len, void *event_data)
+void hyfi_netlink_event_send(struct hyfi_net_bridge *br,
+			 u32 event_type, u32 event_len, void *event_data)
 {
 	struct sk_buff *skb;
 	struct nlmsghdr *nlh = NULL;
@@ -500,7 +516,6 @@ void hyfi_netlink_event_send(u32 event_type, u32 event_len, void *event_data)
 	struct __hatbl_entry *hae;
 	struct net_hatbl_entry *ha;
 	struct net_bridge_port *bp;
-	struct hyfi_net_bridge *br = hyfi_bridge_get(HYFI_BRIDGE_ME);
 
 	if (!br || br->event_pid == NLEVENT_INVALID_PID) {
 		return;

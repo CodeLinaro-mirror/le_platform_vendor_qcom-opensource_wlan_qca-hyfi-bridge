@@ -78,6 +78,7 @@ struct net_hatbl_entry {
 	struct hyfi_aggr_seq_data aggr_seq_data;
 
 	struct hyfi_aggr_rx_entry *aggr_rx_entry;
+	struct hyfi_net_bridge * hyfi_br;
 };
 
 #define HYFI_HACTIVE_TBL_RX_ENTRY \
@@ -125,7 +126,9 @@ struct net_hatbl_entry *hatbl_find(struct hyfi_net_bridge *br, u_int32_t hash,
 		const unsigned char *da, u_int32_t sub_class, u_int32_t priority);
 struct net_hatbl_entry *hatbl_find_ecm(struct hyfi_net_bridge *br, u_int32_t hash,
 		u_int32_t ecm_serial, const unsigned char *da);
-extern int hyfi_hatbl_init(struct hyfi_net_bridge *br);
+extern int hyfi_hatbl_init(void);
+extern int hyfi_hatbl_setup(struct hyfi_net_bridge *br);
+extern void hyfi_hatbl_free(void);
 extern void hyfi_hatbl_fini(struct hyfi_net_bridge *br);
 extern void hyfi_hatbl_flush(struct hyfi_net_bridge *br);
 extern void hyfi_hatbl_cleanup(unsigned long data);

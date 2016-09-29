@@ -236,9 +236,7 @@ int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int32_t has
 	if(!flow)
 		return -1;
 
-	hyfi_br = hyfi_bridge_get(HYFI_BRIDGE_ME);
-
-	if(!hyfi_br) {
+	if (!hyfi_ecm_bridge_attached()) {
 		/* Hy-Fi bridge not attached */
 		return 2;
 	}
@@ -328,13 +326,21 @@ EXPORT_SYMBOL(hyfi_ecm_update_stats);
 void hyfi_ecm_decelerate(u_int32_t hash, u_int32_t ecm_serial, u_int8_t *da)
 {
 	struct net_hatbl_entry *ha = NULL;
-	struct hyfi_net_bridge *hyfi_br;
-	hyfi_br = hyfi_bridge_get(HYFI_BRIDGE_ME);
+	struct hyfi_net_bridge *hyfi_br = NULL;
 
-	if (!hyfi_br) {
+	/* TODO
+	 * Initialize the hyfi_br pointer with valid instance of hyfi_br.
+	 * For now hyfi_ecm_bridge_attached will return 0, as ecm is not
+	 * supported with hyfi multipe bridges.
+	 */
+
+	if (!hyfi_ecm_bridge_attached()) {
 		/* Hy-Fi bridge not attached */
 		return;
 	}
+
+	if (hyfi_br == NULL)
+		return;
 
 	spin_lock_bh(&hyfi_br->hash_ha_lock);
 
@@ -371,9 +377,8 @@ bool hyfi_ecm_port_matches(const struct hyfi_ecm_flow_data_t *flow,
 	u_int32_t traffic_class;
 	bool ret = false;
 	bool unlock_bh;
-	hyfi_br = hyfi_bridge_get(HYFI_BRIDGE_ME);
 
-	if (!hyfi_br) {
+	if (!hyfi_ecm_bridge_attached()) {
 		/* Hy-Fi bridge not attached */
 		return true;
 	}
@@ -466,14 +471,8 @@ EXPORT_SYMBOL(hyfi_ecm_is_port_on_hyfi_bridge);
 
 bool hyfi_ecm_bridge_attached(void)
 {
-	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get(HYFI_BRIDGE_ME);
-
-	if (!hyfi_br) {
-		/* Hy-Fi bridge not attached */
-		return false;
-	}
-
-	return true;
+	printk("%s:ecm unsupported with multiple hyfi bridges\n", __FUNCTION__);
+	return false;
 }
 
 EXPORT_SYMBOL(hyfi_ecm_bridge_attached);

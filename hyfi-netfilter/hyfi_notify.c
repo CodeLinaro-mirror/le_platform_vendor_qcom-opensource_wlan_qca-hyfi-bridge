@@ -45,14 +45,14 @@ static int hyfi_device_event(struct notifier_block *unused, unsigned long event,
 #endif
 	struct net_bridge_port *p = hyfi_br_port_get(dev);
 	struct net_bridge *br;
-	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get(HYFI_BRIDGE_ME);
+	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(dev);
 	u_int32_t device_event;
 
 	if (!hyfi_br)
 		return NOTIFY_DONE;
 
 	/* A bridge event */
-	if (!hyfi_bridge_dev_event(event, dev))
+	if (!hyfi_bridge_dev_event(hyfi_br, event, dev))
 		return NOTIFY_DONE;
 
 	/* Not a port of a bridge */
@@ -75,7 +75,7 @@ static int hyfi_device_event(struct notifier_block *unused, unsigned long event,
 						HYFI_EVENT_LINK_UP : HYFI_EVENT_LINK_DOWN;
 
 		/* Send a link change notification */
-		hyfi_netlink_event_send(device_event, sizeof(u_int32_t), p);
+		hyfi_netlink_event_send(hyfi_br, device_event, sizeof(u_int32_t), p);
 		break;
 
 	case NETDEV_FEAT_CHANGE:
@@ -93,49 +93,49 @@ static int hyfi_device_event(struct notifier_block *unused, unsigned long event,
 
 void hyfi_br_notify(int group, int event, const void *ptr)
 {
-    struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get(HYFI_BRIDGE_ME);
-    if (!hyfi_br)
-        return;
+	struct net_bridge_port *p = (struct net_bridge_port *)ptr;
+	struct hyfi_net_bridge *hf_br = NULL;
 
-    switch (group) {
-        case RTNLGRP_LINK:
-        {
-            struct net_bridge_port *p = (struct net_bridge_port *)ptr;
+	if (p)
+		hf_br = hyfi_bridge_get(p->br);
 
-            if (p->br->dev != hyfi_br->dev)
-                return;
+	if (hf_br == NULL)
+		return;
 
-            switch (event) {
-            case RTM_NEWLINK: {
-                hyfi_bridge_init_port(p);
-                break;
-            }
+	switch (group) {
+		case RTNLGRP_LINK:
+		{
+			switch (event) {
+			case RTM_NEWLINK: {
+				hyfi_bridge_init_port(hf_br, p);
+				break;
+			}
 
-            case RTM_DELLINK: {
-                hyfi_hdtbl_delete_by_port(hyfi_br, p);
-                hyfi_hatbl_delete_by_port(hyfi_br, p);
-                hyfi_bridge_delete_port(p);
+			case RTM_DELLINK: {
+				hyfi_hdtbl_delete_by_port(hf_br, p);
+				hyfi_hatbl_delete_by_port(hf_br, p);
+				hyfi_bridge_delete_port(hf_br, p);
 
-                mc_nbp_change(p, event);
-                break;
-            }
+				mc_nbp_change(hf_br, p, event);
+				break;
+			}
 
-            default:
-                break;
-            }
-        }
-        break;
+			default:
+				break;
+			}
+		}
+		break;
 
-        case RTNLGRP_NEIGH:
-        {
-            struct net_bridge_fdb_entry *fdb = (struct net_bridge_fdb_entry *)ptr;
-            mc_fdb_change(fdb->addr.addr, event);
-        }
-        break;
+		case RTNLGRP_NEIGH:
+		{
+			struct net_bridge_fdb_entry *fdb = (struct net_bridge_fdb_entry *)ptr;
+			mc_fdb_change(hf_br, fdb->addr.addr, event);
+		}
+		break;
 
-        default:
-            break;
-    }
+		default:
+			break;
+	}
 }
 
 int __init hyfi_notify_init(void)

@@ -95,7 +95,7 @@ void hyfi_hatbl_cleanup(unsigned long _data)
 	spin_unlock_bh(&br->hash_ha_lock);
 
 	if (aging) {
-		hyfi_netlink_event_send(HYFI_EVENT_AGEOUT_HA_ENTRIES, 0, NULL);
+		hyfi_netlink_event_send(br, HYFI_EVENT_AGEOUT_HA_ENTRIES, 0, NULL);
 	}
 
 	/* Add HZ/4 to ensure we round the jiffies upwards to be after the next
@@ -354,6 +354,7 @@ static struct net_hatbl_entry *hatbl_create(struct hyfi_net_bridge *br,
 	ha->priority = priority;
 	ha->hash = hash;
 	ha->ecm_serial = UINT_MAX;
+	ha->hyfi_br = br;
 
 	if (static_entry) {
 		hyfi_ha_set_flag(ha, HYFI_HACTIVE_TBL_STATIC_ENTRY);
@@ -479,7 +480,7 @@ struct net_hatbl_entry* hyfi_hatbl_insert(struct hyfi_net_bridge *br,
 	spin_unlock(&br->hash_ha_lock);
 
 	if (ha) {
-		hyfi_netlink_event_send(HYFI_EVENT_ADD_HA_ENTRY,
+		hyfi_netlink_event_send(ha->hyfi_br, HYFI_EVENT_ADD_HA_ENTRY,
 				sizeof(struct __hatbl_entry), ha);
 	}
 	return ha;
@@ -501,7 +502,7 @@ struct net_hatbl_entry* hyfi_hatbl_insert_ecm_classifier(struct hyfi_net_bridge 
 	if (ha) {
 		ha->ecm_serial = ecm_serial;
 
-		hyfi_netlink_event_send(HYFI_EVENT_ADD_HA_ENTRY,
+		hyfi_netlink_event_send(ha->hyfi_br, HYFI_EVENT_ADD_HA_ENTRY,
 				sizeof(struct __hatbl_entry), ha);
 	} else {
 		spin_unlock_bh(&br->hash_ha_lock);
@@ -738,7 +739,7 @@ struct net_hatbl_entry* hyfi_hatbl_insert_from_fdb(struct hyfi_net_bridge *br,
 	ha = hatbl_find_before_create(br, hash, dst, sa, da, id, sub_class, priority, 1);
 
 	if (keep_lock && ha) {
-		hyfi_netlink_event_send(HYFI_EVENT_ADD_HA_ENTRY,
+		hyfi_netlink_event_send(ha->hyfi_br, HYFI_EVENT_ADD_HA_ENTRY,
 			sizeof(struct __hatbl_entry), ha);
 	} else {
 		spin_unlock(&br->hash_ha_lock);
@@ -783,7 +784,7 @@ static void hyfi_hatbl_timer_init(struct hyfi_net_bridge *br)
 	mod_timer(&br->hatbl_timer, jiffies + msecs_to_jiffies(HYFI_HACTIVE_TBL_AGING_TIME));
 }
 
-int __init hyfi_hatbl_init(struct hyfi_net_bridge *br)
+int __init hyfi_hatbl_init(void)
 {
 	hyfi_hatbl_cache = kmem_cache_create("hyfi_hatbl_cache",
 			sizeof(struct net_hatbl_entry),
@@ -793,7 +794,12 @@ int __init hyfi_hatbl_init(struct hyfi_net_bridge *br)
 	if (!hyfi_hatbl_cache)
 		return -ENOMEM;
 
-	br->hatbl_aging_time = msecs_to_jiffies(HYFI_HACTIVE_TBL_EXPIRE_TIME);
+	return 0;
+}
+
+int __init hyfi_hatbl_setup(struct hyfi_net_bridge *br)
+{
+	br->hatbl_aging_time =  msecs_to_jiffies(HYFI_HACTIVE_TBL_EXPIRE_TIME);
 	hyfi_hatbl_timer_init(br);
 
 	return 0;
@@ -811,6 +817,11 @@ void hyfi_hatbl_mark_decelerated(struct net_hatbl_entry *ha)
 	hyfi_ha_clear_flag(ha, HYFI_HACTIVE_TBL_ACCL_ENTRY);
 	hyfi_ha_clear_flag(ha, HYFI_HACTIVE_TBL_SERIAL_VALID);
 	ha->ecm_serial = UINT_MAX;
+}
+
+void hyfi_hatbl_free(void)
+{
+	kmem_cache_destroy(hyfi_hatbl_cache);
 }
 
 void hyfi_hatbl_fini(struct hyfi_net_bridge *br)

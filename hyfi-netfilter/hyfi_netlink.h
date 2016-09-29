@@ -19,7 +19,8 @@
 
 #include "hyfi_bridge.h"
 
-void hyfi_netlink_event_send(u32 event_type, u32 event_len, void *event_data);
+void hyfi_netlink_event_send(struct hyfi_net_bridge *hyfi_br, u32 event_type,
+							 u32 event_len, void *event_data);
 
 int hyfi_netlink_init(void);
 

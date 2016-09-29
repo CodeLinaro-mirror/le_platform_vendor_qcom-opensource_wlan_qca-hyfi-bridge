@@ -31,6 +31,7 @@ struct net_hdtbl_entry {
 	mac_addr id;
 	u_int32_t flags;
 #define HYFI_HDTBL_STATIC_ENTRY		0x00000001
+	struct hyfi_net_bridge * hyfi_br;
 };
 
 extern u_int32_t hdtbl_salt __read_mostly;

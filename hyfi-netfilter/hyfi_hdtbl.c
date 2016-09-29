@@ -187,7 +187,8 @@ struct net_hdtbl_entry *hyfi_hdtbl_find(struct hyfi_net_bridge *br,
 	return NULL;
 }
 
-static struct net_hdtbl_entry *hdtbl_create(struct hlist_head *head,
+static struct net_hdtbl_entry *hdtbl_create(struct hyfi_net_bridge * hyfi_br,
+		struct hlist_head *head,
 		struct net_bridge_port *dst_udp, struct net_bridge_port *dst_other,
 		const u_int8_t *addr, const u_int8_t *id, u_int32_t static_entry)
 {
@@ -201,6 +202,7 @@ static struct net_hdtbl_entry *hdtbl_create(struct hlist_head *head,
 		hd->dst_udp = dst_udp;
 		hd->dst_other = dst_other;
 		hd->flags = 0;
+		hd->hyfi_br = hyfi_br;
 		if (static_entry) {
 			hyfi_hd_set_flag(hd, HYFI_HDTBL_STATIC_ENTRY);
 		} else {
@@ -227,7 +229,7 @@ static int hdtbl_insert(struct hyfi_net_bridge *br,
 		hdtbl_delete(hd);
 	}
 
-	if (!hdtbl_create(head, dst_udp, dst_other, addr, id, static_entry))
+	if (!hdtbl_create(br, head, dst_udp, dst_other, addr, id, static_entry))
 		return -ENOMEM;
 
 	return 0;
@@ -353,7 +355,7 @@ int hyfi_hdtbl_update(struct hyfi_net_bridge *br, struct net_device *br_dev,
 		else
 			hyfi_hd_clear_flag(hd, HYFI_HDTBL_STATIC_ENTRY);
 	} else {
-		hd = hdtbl_create(head, br_port_u, br_port_o, hde->mac_addr, hde->id,
+		hd = hdtbl_create(br, head, br_port_u, br_port_o, hde->mac_addr, hde->id,
 				hde->static_entry);
 	}
 

@@ -23,8 +23,8 @@ struct mc_mdb_entry *mc_mdb_find(struct hlist_head *head, struct mc_ip *group);
 int mc_attach(struct hyfi_net_bridge *hyfi_br);
 void mc_detach(struct hyfi_net_bridge *hyfi_br);
 
-extern void mc_nbp_change(struct net_bridge_port *p, int event);
-extern void mc_fdb_change(__u8 *mac, int change);
+extern void mc_nbp_change(struct hyfi_net_bridge *hyfi_br, struct net_bridge_port *p, int event);
+extern void mc_fdb_change(struct hyfi_net_bridge *hyfi_br, __u8 *mac, int change);
 
 #endif
 

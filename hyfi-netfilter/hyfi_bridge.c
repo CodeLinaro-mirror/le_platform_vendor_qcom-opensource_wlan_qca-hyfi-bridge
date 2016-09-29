@@ -38,11 +38,12 @@ static char hyfi_linux_bridge[IFNAMSIZ] = "";
 /* This parameter can be set from the insmod command line */
 MODULE_PARM_DESC(hyfi_linux_bridge, "Default Hy-Fi managed bridge");
 
-static struct hyfi_net_bridge hyfi_br __read_mostly;
-static int hyfi_bridge_ports_init(struct net_device *br_dev);
-static int hyfi_bridge_init_bridge_device(const char *br_name);
-static int hyfi_bridge_deinit_bridge_device(void);
-static int hyfi_bridge_del_ports(void);
+static struct hyfi_net_bridge hyfi_bridges[HYFI_BRIDGE_MAX] __read_mostly;
+
+static int hyfi_bridge_ports_init(struct hyfi_net_bridge *hyfi_br, struct net_device *br_dev);
+static int hyfi_bridge_init_bridge_device(struct hyfi_net_bridge *hyfi_br, const char *br_name);
+static int hyfi_bridge_deinit_bridge_device(struct hyfi_net_bridge *hyfi_br);
+static int hyfi_bridge_del_ports(struct hyfi_net_bridge *hyfi_br);
 static void hyfi_destroy_port_rcu(struct rcu_head *head);
 
 /**
@@ -65,83 +66,111 @@ static void hyfi_sync_and_free_bridge_device(struct net_device *br_dev) {
 	dev_put(br_dev);
 }
 
-int hyfi_bridge_set_bridge_name(const char *br_name)
+struct hyfi_net_bridge * hyfi_bridge_get_hyfi_bridge(const char *br_name)
+{
+	int i;
+	struct net_device *br_dev;
+
+	br_dev = dev_get_by_name(&init_net, br_name);
+	if (br_dev == NULL)
+	  return NULL;
+
+	for (i = 0; i < HYFI_BRIDGE_MAX; i++) {
+		if (hyfi_bridges[i].dev == br_dev) {
+			dev_put(br_dev);
+			return &hyfi_bridges[i];
+		}
+	}
+
+	dev_put(br_dev);
+	return NULL;
+}
+
+struct hyfi_net_bridge * hyfi_bridge_alloc_hyfi_bridge(const char *br_name)
+{
+	int i;
+	struct hyfi_net_bridge *hf_br;
+
+	hf_br = hyfi_bridge_get_hyfi_bridge(br_name);
+	if (hf_br)
+		return hf_br;
+
+	for (i = 0; i < HYFI_BRIDGE_MAX; i++) {
+		if (hyfi_bridges[i].dev == NULL)
+			return &hyfi_bridges[i];
+	}
+	return NULL;
+}
+
+int hyfi_bridge_set_bridge_name(struct hyfi_net_bridge *hyfi_br, const char *br_name)
 {
 	int retval = 0;
 	struct net_device *br_dev;
 
-	spin_lock_bh(&hyfi_br.lock);
+	spin_lock_bh(&hyfi_br->lock);
 
-	br_dev = hyfi_br.dev;
+	br_dev = hyfi_br->dev;
 
 	if (!br_name) {
 		if (br_dev) {
 			/* Detach from existing bridge */
-			hyfi_bridge_deinit_bridge_device();
+			hyfi_bridge_deinit_bridge_device(hyfi_br);
 		}
 
-		spin_unlock_bh(&hyfi_br.lock);
+		spin_unlock_bh(&hyfi_br->lock);
 		if (br_dev) {
 			hyfi_sync_and_free_bridge_device(br_dev);
 		}
 		return 0;
 	}
 
-	if (hyfi_br.dev && !strcmp(hyfi_br.dev->name, br_name)) {
+	if (hyfi_br->dev && !strcmp(hyfi_br->dev->name, br_name)) {
 		/* Bridge already attached */
-		spin_unlock_bh(&hyfi_br.lock);
+		spin_unlock_bh(&hyfi_br->lock);
 		return 0;
 	}
 
-	if (hyfi_br.dev) {
+	if (hyfi_br->dev) {
 		/* Detach from existing bridge */
-		hyfi_bridge_deinit_bridge_device();
-		hyfi_linux_bridge[0] = 0;
+		hyfi_bridge_deinit_bridge_device(hyfi_br);
 	}
 
 	/* Update new bridge */
-	retval = hyfi_bridge_init_bridge_device(br_name);
+	retval = hyfi_bridge_init_bridge_device(hyfi_br, br_name);
 
-	spin_unlock_bh(&hyfi_br.lock);
+	spin_unlock_bh(&hyfi_br->lock);
 
 	if (br_dev)
 		hyfi_sync_and_free_bridge_device(br_dev);
 	return retval;
 }
 
-const char *hyfi_bridge_get_bridge_name(void)
+int hyfi_bridge_dev_event(struct hyfi_net_bridge *hyfi_br,
+                          unsigned long event, struct net_device *dev)
 {
-	if (!hyfi_linux_bridge[0])
-		return NULL ;
+	int sync_and_free = 0;
 
-	return hyfi_linux_bridge;
-}
+	spin_lock_bh(&hyfi_br->lock);
 
-int hyfi_bridge_dev_event(unsigned long event, struct net_device *dev)
-{
-	struct net_device *br_dev = NULL;
-	spin_lock_bh(&hyfi_br.lock);
-
-	if (hyfi_br.dev && dev != hyfi_br.dev) {
-		spin_unlock_bh(&hyfi_br.lock);
+	if (hyfi_br->dev && dev != hyfi_br->dev) {
+		spin_unlock_bh(&hyfi_br->lock);
 		return -1;
 	}
 
 	switch (event) {
 	case NETDEV_DOWN:
-		if (!hyfi_br.dev)
+		if (!hyfi_br->dev)
 			break;
 
 		DEBUG_TRACE("Interface %s is down, ptr = %p\n", dev->name, dev);
 
-		br_dev = hyfi_br.dev;
-
 		/* Free the hold of the device */
-		hyfi_bridge_deinit_bridge_device();
+		hyfi_bridge_deinit_bridge_device(hyfi_br);
+		sync_and_free = 1;
 		break;
 
 	case NETDEV_UP:
-		if (dev == hyfi_br.dev)
+		if (dev == hyfi_br->dev)
 			break;
 
 		if (!strcmp(dev->name, hyfi_linux_bridge)) {
@@ -150,10 +179,10 @@ int hyfi_bridge_dev_event(unsigned long event, struct net_device *dev)
 			if (dev->priv_flags != IFF_EBRIDGE) {
 				DEBUG_ERROR("hyfi-bridging: Device %s is NOT a bridge!\n", dev->name);
 			} else {
-				if (hyfi_bridge_init_bridge_device(hyfi_linux_bridge)) {
+				if (hyfi_bridge_init_bridge_device(hyfi_br, hyfi_linux_bridge)) {
 					DEBUG_ERROR("hyfi-bridging: Failed to initialize device %s\n", dev->name);
-					br_dev = hyfi_br.dev;
-					hyfi_bridge_deinit_bridge_device();
+					hyfi_br->dev = NULL;
+					sync_and_free = 1;
 				}
 			}
 		}
@@ -166,18 +195,19 @@ int hyfi_bridge_dev_event(unsigned long event, struct net_device *dev)
 		break;
 	}
 
-	spin_unlock_bh(&hyfi_br.lock);
+	spin_unlock_bh(&hyfi_br->lock);
 
-	if (br_dev)
-		hyfi_sync_and_free_bridge_device(br_dev);
+	if (sync_and_free)
+		hyfi_sync_and_free_bridge_device(dev);
+
 	return 0;
 }
 
-static int hyfi_bridge_del_ports(void)
+static int hyfi_bridge_del_ports(struct hyfi_net_bridge *hyfi_br)
 {
 	struct hyfi_net_bridge_port *hyfi_p;
 
-	list_for_each_entry_rcu(hyfi_p, &hyfi_br.port_list, list) {
+	list_for_each_entry_rcu(hyfi_p, &hyfi_br->port_list, list) {
 		list_del_rcu(&hyfi_p->list);
 		call_rcu(&hyfi_p->rcu, hyfi_destroy_port_rcu);
 	}
@@ -185,7 +215,7 @@ static int hyfi_bridge_del_ports(void)
 	return 0;
 }
 
-int hyfi_bridge_init_port(struct net_bridge_port *p)
+int hyfi_bridge_init_port(struct hyfi_net_bridge *hyfi_br, struct net_bridge_port *p)
 {
 	struct hyfi_net_bridge_port *hyfi_p;
 
@@ -212,7 +242,7 @@ int hyfi_bridge_init_port(struct net_bridge_port *p)
 	hyfi_p->port_type = HYFI_PORT_INVALID_TYPE;
 	hyfi_p->dev = p->dev;
 
-	list_add_rcu(&hyfi_p->list, &hyfi_br.port_list);
+	list_add_rcu(&hyfi_p->list, &hyfi_br->port_list);
 	DEBUG_INFO("hyfi: Added interface %s\n", p->dev->name);
 
 	return 0;
@@ -227,14 +257,14 @@ static void hyfi_destroy_port_rcu(struct rcu_head *head)
 	kfree(hyfi_p);
 }
 
-int hyfi_bridge_delete_port(struct net_bridge_port *p)
+int hyfi_bridge_delete_port(struct hyfi_net_bridge *hyfi_br, struct net_bridge_port *p)
 {
 	struct hyfi_net_bridge_port *hyfi_p;
 
 	if (unlikely(!p))
 		return 0;
 
-	list_for_each_entry_rcu(hyfi_p, &hyfi_br.port_list, list) {
+	list_for_each_entry_rcu(hyfi_p, &hyfi_br->port_list, list) {
 		if (hyfi_p->dev == p->dev) {
 			list_del_rcu(&hyfi_p->list);
 			call_rcu(&hyfi_p->rcu, hyfi_destroy_port_rcu);
@@ -247,28 +277,23 @@ int hyfi_bridge_delete_port(struct net_bridge_port *p)
 
 struct hyfi_net_bridge_port *hyfi_bridge_get_port(const struct net_bridge_port *p)
 {
-	struct hyfi_net_bridge_port *hyfi_p;
-
-	if (unlikely(!p))
-		return NULL;
-
-	list_for_each_entry_rcu(hyfi_p, &hyfi_br.port_list, list) {
-		if (hyfi_p->dev == p->dev) {
-			return hyfi_p;
-		}
-	}
-
-	return NULL;
+	return hyfi_bridge_get_port_by_dev(p->dev);
 }
 
 struct hyfi_net_bridge_port *hyfi_bridge_get_port_by_dev(const struct net_device *dev)
 {
 	struct hyfi_net_bridge_port *hyfi_p;
+	struct hyfi_net_bridge *hyfi_br;
 
 	if (unlikely(!dev))
 		return NULL;
 
-	list_for_each_entry_rcu(hyfi_p, &hyfi_br.port_list, list) {
+	hyfi_br = hyfi_bridge_get_by_dev(dev);
+
+	if (unlikely(!hyfi_br))
+		return NULL;
+
+	list_for_each_entry_rcu(hyfi_p, &hyfi_br->port_list, list) {
 		if (hyfi_p->dev == dev) {
 			return hyfi_p;
 		}
@@ -277,7 +302,7 @@ struct hyfi_net_bridge_port *hyfi_bridge_get_port_by_dev(const struct net_device
 	return NULL;
 }
 
-static int hyfi_bridge_ports_init(struct net_device *br_dev)
+static int hyfi_bridge_ports_init(struct hyfi_net_bridge *hyfi_br, struct net_device *br_dev)
 {
 	struct net_device *dev;
 
@@ -287,10 +312,10 @@ static int hyfi_bridge_ports_init(struct net_device *br_dev)
 	while (dev) {
 		struct net_bridge_port *br_port = hyfi_br_port_get(dev);
 		if (br_port && br_port->br) {
-		    if (br_port->br->dev == br_dev) {
-                /* Add to bridge port extended member */
-                hyfi_bridge_init_port(br_port);
-		    }
+			if (br_port->br->dev == br_dev) {
+				/* Add to bridge port extended member */
+				hyfi_bridge_init_port(hyfi_br, br_port);
+			}
 		}
 
 		dev = next_net_device(dev);
@@ -303,15 +328,15 @@ static int hyfi_bridge_ports_init(struct net_device *br_dev)
 
 struct hyfi_net_bridge *hyfi_bridge_get(const struct net_bridge *br)
 {
-	if (hyfi_br.dev && (!br || br->dev == hyfi_br.dev))
-		return &hyfi_br;
+	if (br == NULL)
+		return NULL;
 
-	return NULL;
+	return hyfi_bridge_get_by_dev(br->dev);
 }
 
 struct net_device *hyfi_bridge_dev_get_rcu(const struct hyfi_net_bridge *br)
 {
-	struct net_device *dev = rcu_dereference(hyfi_br.dev);
+	struct net_device *dev = rcu_dereference(br->dev);
 	return dev;
 }
 
@@ -319,31 +344,43 @@ struct hyfi_net_bridge *hyfi_bridge_get_by_dev(const struct net_device *dev)
 {
 	struct net_bridge_port *br_port;
 	const struct net_device *br_dev;
+	int i;
 
-	if (unlikely(!hyfi_br.dev || !dev))
-		return NULL;
+	if (!dev) {
+	  return NULL;
+	}
 
 	if (dev->priv_flags & IFF_EBRIDGE) {
 		br_dev = dev;
 	} else {
 		br_port = hyfi_br_port_get(dev);
 
-		if (!br_port)
+		if (!br_port) {
 			return NULL;
+		}
 
 		br_dev = br_port->br->dev;
 	}
 
-	if (br_dev == hyfi_br.dev)
-		return &hyfi_br;
+	for (i = 0; i < HYFI_BRIDGE_MAX; i++) {
+		if (hyfi_bridges[i].dev && (br_dev == hyfi_bridges[i].dev)) {
+			return &hyfi_bridges[i];
+		}
+	}
 
 	return NULL;
+}
+
+struct hyfi_net_bridge *hyfi_bridge_get_by_port(const struct net_bridge_port *port)
+{
+	return (port ? hyfi_bridge_get_by_dev(port->dev): NULL) ;
 }
 
 static inline struct net_bridge_port *hyfi_bridge_handle_ha(struct net_hatbl_entry *ha,
 		struct sk_buff **skb)
 {
 	struct net_bridge_port *dst;
+	struct hyfi_net_bridge * hyfi_br = ha->hyfi_br;
 
 	if (likely(ha->dst->dev)) {
 		if ( hyfi_ha_has_flag(ha,
@@ -359,14 +396,14 @@ static inline struct net_bridge_port *hyfi_bridge_handle_ha(struct net_hatbl_ent
 		return dst;
 	}
 
-	hyfi_hatbl_delete_by_port(&hyfi_br, ha->dst);
+	hyfi_hatbl_delete_by_port(hyfi_br, ha->dst);
 	return NULL;
 }
 
 static inline struct net_bridge_port *hyfi_bridge_handle_hd(struct net_hdtbl_entry *hd,
 		struct sk_buff **skb, u_int32_t hash, u_int32_t traffic_class, u_int32_t priority)
 {
-	struct net_hatbl_entry *ha = hyfi_hatbl_insert(&hyfi_br, hash,
+	struct net_hatbl_entry *ha = hyfi_hatbl_insert(hd->hyfi_br, hash,
 			traffic_class, hd, priority,
 			eth_hdr(*skb)->h_source);
 
@@ -430,7 +467,9 @@ static struct net_bridge_port *hyfi_bridge_handle_aggr(struct net_hatbl_entry *h
  *
  * @return destination port if found, NULL if not
  */
-static struct net_bridge_port *hyfi_bridge_get_dst_port(const struct net_bridge *br,
+static struct net_bridge_port *hyfi_bridge_get_dst_port(
+	struct hyfi_net_bridge * hyfi_br,
+	const struct net_bridge *br,
 	u_int32_t hash, u_int32_t traffic_class,
 	u_int32_t priority, struct sk_buff *skb,
 	const unsigned char *dest_addr, const unsigned char *src_addr,
@@ -442,7 +481,7 @@ static struct net_bridge_port *hyfi_bridge_get_dst_port(const struct net_bridge 
 
 	/* First, look up in the H-Active table. If not exists, look up in
 	 * the H-Default table. Finally, if not in there, look up in the FDB. */
-	ha = __hyfi_hatbl_get(&hyfi_br, hash, dest_addr,
+	ha = __hyfi_hatbl_get(hyfi_br, hash, dest_addr,
 			traffic_class, priority);
 
 	if (ha) {
@@ -450,11 +489,11 @@ static struct net_bridge_port *hyfi_bridge_get_dst_port(const struct net_bridge 
 			*ha_out = ha;
 		}
 		return ha->dst;
-	} else if ((hd = __hyfi_hdtbl_get(&hyfi_br, dest_addr))) {
+	} else if ((hd = __hyfi_hdtbl_get(hyfi_br, dest_addr))) {
 		/* Create a new entry based on H-Default table */
 		return hyfi_bridge_handle_hd(hd, &skb, hash, traffic_class, priority);
 	} else if ((dst = os_br_fdb_get((struct net_bridge *)br, dest_addr)) && !dst->is_local) {
-		hyfi_hatbl_insert_from_fdb(&hyfi_br, hash, dst->dst, src_addr,
+		hyfi_hatbl_insert_from_fdb(hyfi_br, hash, dst->dst, src_addr,
 			dest_addr, br->dev->dev_addr,
 			traffic_class, priority, false /* keep_lock */);
 
@@ -477,13 +516,14 @@ static struct net_bridge_port *hyfi_bridge_get_dst_port(const struct net_bridge 
  * @return destination port if found, NULL if not
  */
 static struct net_bridge_port *hyfi_bridge_get_dst_port_no_hash(
+	struct hyfi_net_bridge * hyfi_br,
 	const struct net_bridge *br, u_int32_t traffic_class,
 	const unsigned char *addr)
 {
 	struct net_hdtbl_entry *hd;
 	struct net_bridge_fdb_entry *dst;
 
-	hd = __hyfi_hdtbl_get(&hyfi_br, addr);
+	hd = __hyfi_hdtbl_get(hyfi_br, addr);
 	if (hd) {
 		if (traffic_class == HYFI_TRAFFIC_CLASS_UDP) {
 			DEBUG_TRACE("%02x:%02x:%02x:%02x:%02x:%02x: Match in "
@@ -527,6 +567,7 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 	u_int16_t seq = ~0;
 	const struct net_bridge *br;
 	struct net_bridge_port *port;
+	struct hyfi_net_bridge *hyfi_br;
 
 	if (src) {
 		/* Bridged interface */
@@ -536,7 +577,9 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 		br = netdev_priv(BR_INPUT_SKB_CB(*skb)->brdev);
 	}
 
-	if (unlikely(!br || !hyfi_br.dev || br->dev != hyfi_br.dev))
+	hyfi_br = hyfi_bridge_get(br);
+
+	if (unlikely(!br || !hyfi_br || !hyfi_br->dev || br->dev != hyfi_br->dev))
 		return NULL;
 
 	if (unlikely(hyfi_hash_skbuf(*skb, &hash, &flag, &priority, &seq)))
@@ -549,15 +592,15 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 	 * stream will be transmitted back on the same medium (if hyfi_tcp_sp
 	 * is enabled).
 	 */
-	if (src && (flag & IS_IPPROTO_TCP) && hyfi_tcp_sp(&hyfi_br) &&
+	if (src && (flag & IS_IPPROTO_TCP) && hyfi_tcp_sp(hyfi_br) &&
 			!hyfi_portgrp_relay(hyfi_bridge_get_port(src)) &&
-			(hd = __hyfi_hdtbl_get(&hyfi_br, eth_hdr(*skb)->h_source))) {
-				hyfi_hatbl_update_local(&hyfi_br, hash,eth_hdr(*skb)->h_source,
+			(hd = __hyfi_hdtbl_get(hyfi_br, eth_hdr(*skb)->h_source))) {
+				hyfi_hatbl_update_local(hyfi_br, hash,eth_hdr(*skb)->h_source,
 						eth_hdr(*skb)->h_dest, hd, (struct net_bridge_port *)src,
 						HYFI_TRAFFIC_CLASS_OTHER, priority, flag);
 	}
 
-	port = hyfi_bridge_get_dst_port(br, hash, traffic_class,
+	port = hyfi_bridge_get_dst_port(hyfi_br, br, hash, traffic_class,
 		priority, *skb, eth_hdr(*skb)->h_dest, eth_hdr(*skb)->h_source, &ha);
 
  	if (ha) {
@@ -571,7 +614,7 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 		}
 
 		if(hyfi_ha_has_flag(ha, HYFI_HACTIVE_TBL_TRACKED_ENTRY)) {
-			if(!hyfi_psw_process_pkt(ha, skb, &hyfi_br))
+			if(!hyfi_psw_process_pkt(ha, skb, hyfi_br))
 				return ha->dst;
 
 			return (struct net_bridge_port *) -1;
@@ -583,9 +626,9 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 	}
 
 	if(unlikely(flag & (IS_HYFI_PKT | IS_HYFI_IP_PKT))) {
-		hyfi_psw_process_hyfi_pkt(&hyfi_br, *skb, flag);
+		hyfi_psw_process_hyfi_pkt(hyfi_br, *skb, flag);
 
-		if(hyfi_br.path_switch_param.drop_markers) {
+		if(hyfi_br->path_switch_param.drop_markers) {
 			kfree_skb(*skb);
 			*skb = NULL;
 			return (struct net_bridge_port *) -1;
@@ -601,7 +644,7 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 			return NULL;
 		}
 
-		ha = hyfi_hatbl_create_aggr_entry(&hyfi_br, hash, eth_hdr(*skb)->h_source,
+		ha = hyfi_hatbl_create_aggr_entry(hyfi_br, hash, eth_hdr(*skb)->h_source,
 				eth_hdr(*skb)->h_dest, traffic_class, priority, seq);
 
 		if(!ha) {
@@ -631,8 +674,17 @@ struct net_bridge_port *hyfi_bridge_port_dev_get(struct net_device *dev,
 	const unsigned char *dest_addr, *src_addr;
 	struct net_hatbl_entry *ha;
 	struct net_bridge_port *port = NULL;
+	struct net_bridge_port *br_port = hyfi_br_port_get(dev);
+	struct hyfi_net_bridge * hyfi_br = NULL;
 
-	if (unlikely(!br || !hyfi_br.dev || dev != hyfi_br.dev))
+	if (unlikely(!br_port))
+		return NULL;
+
+	hyfi_br = hyfi_bridge_get_by_port(br_port);
+	if (unlikely(!hyfi_br))
+		return NULL;
+
+	if (unlikely(!br || !hyfi_br->dev || dev != hyfi_br->dev))
 		return NULL;
 
 	if (unlikely(hyfi_hash_skbuf(skb, &hash, &flag, &priority, &seq)))
@@ -663,7 +715,7 @@ struct net_bridge_port *hyfi_bridge_port_dev_get(struct net_device *dev,
 		 * However, can determine the egress port from addr by looking up
 		 * in H-Default and FDB
 		 */
-		return hyfi_bridge_get_dst_port_no_hash(br, traffic_class, addr);
+		return hyfi_bridge_get_dst_port_no_hash(hyfi_br, br, traffic_class, addr);
 	} else if (memcmp(eth_hdr(skb)->h_dest, addr, ETH_ALEN)) {
 		/* Should be using reverse hash */
 		if (unlikely(hyfi_hash_skbuf_reverse(skb, &hash)))
@@ -694,8 +746,8 @@ struct net_bridge_port *hyfi_bridge_port_dev_get(struct net_device *dev,
 	/*
 	 * Try looking up via ECM serial (passed in via the cookie) first
 	 */
-	spin_lock_bh(&hyfi_br.hash_ha_lock);
-	ha = hatbl_find_ecm(&hyfi_br, hash, ecm_serial, dest_addr);
+	spin_lock_bh(&hyfi_br->hash_ha_lock);
+	ha = hatbl_find_ecm(hyfi_br, hash, ecm_serial, dest_addr);
 	if (ha) {
 		/* Update priority if needed*/
 		if (ha->priority != priority) {
@@ -710,14 +762,14 @@ struct net_bridge_port *hyfi_bridge_port_dev_get(struct net_device *dev,
 		port = ha->dst;
 	}
 
-	spin_unlock_bh(&hyfi_br.hash_ha_lock);
+	spin_unlock_bh(&hyfi_br->hash_ha_lock);
 
 	if (port) {
 		return port;
 	}
 
 	/* No H-Active match - new flow? */
-	return hyfi_bridge_get_dst_port(br, hash, traffic_class,
+	return hyfi_bridge_get_dst_port(hyfi_br, br, hash, traffic_class,
 		priority, skb, dest_addr, src_addr, NULL);
 }
 
@@ -736,32 +788,43 @@ int hyfi_bridge_should_deliver(const struct hyfi_net_bridge_port *src,
 	return 1;
 }
 
-static int hyfi_bridge_deinit_bridge_device(void)
+static int hyfi_bridge_deinit_bridge_device(struct hyfi_net_bridge *hf_br)
 {
 	struct net_device *br_dev;
-	hyfi_linux_bridge[0] = 0;
+	int i, del_hooks = 1;
 
 	/* Detach from existing bridge */
-	br_dev = hyfi_br.dev;
+	br_dev = hf_br->dev;
 
 	if (!br_dev) {
 		return -1;
 	}
 
+	if (!strncmp(br_dev->name, hyfi_linux_bridge, strlen(hyfi_linux_bridge))) {
+		hyfi_linux_bridge[0] = 0;
+	}
+	hf_br->linux_bridge[0] = 0;
 	br_dev->needed_headroom -= 80;
 
 	/* Multicast module detach to the bridge */
-	mc_detach(&hyfi_br);
+	mc_detach(hf_br);
 
-	rcu_assign_pointer(br_get_dst_hook, NULL);
-	rcu_assign_pointer(br_port_dev_get_hook, NULL);
+	hyfi_bridge_del_ports(hf_br);
 
-	hyfi_bridge_del_ports();
+	hyfi_hatbl_flush(hf_br);
+	hyfi_hdtbl_flush(hf_br);
 
-	hyfi_hatbl_flush(&hyfi_br);
-	hyfi_hdtbl_flush(&hyfi_br);
+	rcu_assign_pointer(hf_br->dev, NULL);
 
-	rcu_assign_pointer(hyfi_br.dev, NULL);
+	for (i = 0; i < HYFI_BRIDGE_MAX; i++) {
+		if (hyfi_bridges[i].dev != NULL)
+			del_hooks = 0;
+	}
+	if (del_hooks) {
+		rcu_assign_pointer(br_get_dst_hook, NULL);
+		rcu_assign_pointer(br_port_dev_get_hook, NULL);
+	}
+
 	/*
 	 * Note: Can't put the device until RCU is synchronized, which can't
 	 * be done under lock.
@@ -771,7 +834,7 @@ static int hyfi_bridge_deinit_bridge_device(void)
 	return 0;
 }
 
-static int hyfi_bridge_init_bridge_device(const char *br_name)
+static int hyfi_bridge_init_bridge_device(struct hyfi_net_bridge *hyfi_br, const char *br_name)
 {
 	struct net_device *br_dev;
 
@@ -782,21 +845,21 @@ static int hyfi_bridge_init_bridge_device(const char *br_name)
 	br_dev = dev_get_by_name(&init_net, br_name);
 
 	if (!br_dev) {
-		strlcpy(hyfi_linux_bridge, br_name, IFNAMSIZ);
+		strlcpy(hyfi_br->linux_bridge, br_name, IFNAMSIZ);
 		return 0;
 	}
 
-	strlcpy(hyfi_linux_bridge, br_name, IFNAMSIZ);
+	strlcpy(hyfi_br->linux_bridge, br_name, IFNAMSIZ);
 
 	/* Default bridge configuration */
-	hyfi_br.flags = HYFI_BRIDGE_FLAG_MODE_RELAY_OVERRIDE
+	hyfi_br->flags = HYFI_BRIDGE_FLAG_MODE_RELAY_OVERRIDE
 			| HYFI_BRIDGE_FLAG_MODE_TCP_SP;
 
 	br_dev->needed_headroom += 80;
 
 	/* Init ports */
-	hyfi_bridge_ports_init(br_dev);
-	rcu_assign_pointer(hyfi_br.dev, br_dev);
+	hyfi_bridge_ports_init(hyfi_br, br_dev);
+	rcu_assign_pointer(hyfi_br->dev, br_dev);
 
 	/* see br_input.c */
 	rcu_assign_pointer(br_get_dst_hook, hyfi_bridge_get_dst);
@@ -805,8 +868,8 @@ static int hyfi_bridge_init_bridge_device(const char *br_name)
 	rcu_assign_pointer(br_port_dev_get_hook, hyfi_bridge_port_dev_get);
 
 	/* Multicast module attach to the bridge */
-	if (mc_attach(&hyfi_br)<0)
-            return -1;
+	if (mc_attach(hyfi_br)<0)
+		return -1;
 
 	DEBUG_INFO("hyfi: Bridge %s is now attached\n", br_dev->name);
 
@@ -815,32 +878,45 @@ static int hyfi_bridge_init_bridge_device(const char *br_name)
 
 int __init hyfi_bridge_init(void)
 {
-	memset(&hyfi_br, 0, sizeof(struct hyfi_net_bridge));
+	int i;
+	memset(&hyfi_bridges, 0, sizeof(hyfi_bridges));
 
-	spin_lock_init(&hyfi_br.lock);
+	strncpy(hyfi_bridges[0].linux_bridge, hyfi_linux_bridge, IFNAMSIZ);
 
-	hyfi_br.event_pid = NLEVENT_INVALID_PID;
-	INIT_LIST_HEAD(&hyfi_br.port_list);
-
-	/* Init tables */
-	if (hyfi_hatbl_init(&hyfi_br))
-		return -1;
-
+	hyfi_hatbl_init();
 	if (hyfi_hdtbl_init()) {
-		hyfi_hatbl_fini(&hyfi_br);
+		hyfi_hatbl_free();
 		return -1;
 	}
 
-	/* Init seamless path switching */
-	hyfi_psw_init(&hyfi_br);
+	for (i = 0; i < HYFI_BRIDGE_MAX; i++) {
+		spin_lock_init(&hyfi_bridges[i].lock);
+
+		hyfi_bridges[i].event_pid = NLEVENT_INVALID_PID;
+		INIT_LIST_HEAD(&hyfi_bridges[i].port_list);
+
+		/* Init tables */
+		if (hyfi_hatbl_setup(&hyfi_bridges[i]))
+			return -1;
+
+		/* Init seamless path switching */
+		hyfi_psw_init(&hyfi_bridges[i]);
+	}
 
 	return 0;
 }
 
 void __exit hyfi_bridge_fini(void)
 {
-	hyfi_bridge_set_bridge_name(NULL);
+	int i;
 
-	hyfi_hatbl_fini(&hyfi_br);
-	hyfi_hdtbl_fini(&hyfi_br);
+	for (i = 0; i < HYFI_BRIDGE_MAX; i++) {
+		hyfi_bridge_set_bridge_name(&hyfi_bridges[i], NULL);
+
+		hyfi_hatbl_fini(&hyfi_bridges[i]);
+		hyfi_hdtbl_fini(&hyfi_bridges[i]);
+	}
+
+	hyfi_hatbl_free();
+
 }
