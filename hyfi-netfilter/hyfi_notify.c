@@ -93,18 +93,18 @@ static int hyfi_device_event(struct notifier_block *unused, unsigned long event,
 
 void hyfi_br_notify(int group, int event, const void *ptr)
 {
-	struct net_bridge_port *p = (struct net_bridge_port *)ptr;
 	struct hyfi_net_bridge *hf_br = NULL;
-
-	if (p)
-		hf_br = hyfi_bridge_get(p->br);
-
-	if (hf_br == NULL)
-		return;
 
 	switch (group) {
 		case RTNLGRP_LINK:
 		{
+			struct net_bridge_port *p = (struct net_bridge_port *)ptr;
+			if (p)
+				hf_br = hyfi_bridge_get(p->br);
+
+			if (hf_br == NULL)
+				return;
+
 			switch (event) {
 			case RTM_NEWLINK: {
 				hyfi_bridge_init_port(hf_br, p);
@@ -129,6 +129,13 @@ void hyfi_br_notify(int group, int event, const void *ptr)
 		case RTNLGRP_NEIGH:
 		{
 			struct net_bridge_fdb_entry *fdb = (struct net_bridge_fdb_entry *)ptr;
+
+			if (fdb && fdb->dst)
+				hf_br = hyfi_bridge_get(fdb->dst->br);
+
+			if (hf_br == NULL)
+				return;
+
 			mc_fdb_change(hf_br, fdb->addr.addr, event);
 		}
 		break;
