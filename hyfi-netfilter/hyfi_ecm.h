@@ -73,7 +73,8 @@ static inline void hyfi_ecm_clear_flag(struct hyfi_ecm_flow_data_t *flow,
  */
 int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int32_t hash,
 	u_int8_t *da, u_int8_t *sa, u_int64_t num_bytes, u_int64_t num_packets,
-	u_int32_t time_now, bool *should_keep_on_fdb_update, u_int32_t *new_elapsed_time);
+	u_int32_t time_now, bool *should_keep_on_fdb_update, u_int32_t *new_elapsed_time,
+	const char *br_name);
 
 /**
  * @brief An ECM connection is removed from the database, mark
@@ -85,7 +86,8 @@ int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int32_t has
  * @param [in] da  destination MAC address of the flow to
  *                 decelerate
  */
-void hyfi_ecm_decelerate(u_int32_t hash, u_int32_t ecm_serial, u_int8_t *da);
+void hyfi_ecm_decelerate(u_int32_t hash, u_int32_t ecm_serial, u_int8_t *da,
+	const char *br_name);
 
 /**
  * @brief Check if an ECM connection should be kept.
@@ -97,7 +99,8 @@ void hyfi_ecm_decelerate(u_int32_t hash, u_int32_t ecm_serial, u_int8_t *da);
  * @return true if the connection should be kept, false
  *         otherwise
  */
-bool hyfi_ecm_should_keep(const struct hyfi_ecm_flow_data_t *flow, uint8_t *mac);
+bool hyfi_ecm_should_keep(const struct hyfi_ecm_flow_data_t *flow, uint8_t *mac,
+	const char *br_name);
 
 /**
  * @brief Determine if the port provided by ECM matches the HyFi
@@ -113,7 +116,7 @@ bool hyfi_ecm_should_keep(const struct hyfi_ecm_flow_data_t *flow, uint8_t *mac)
  *         otherwise
  */
 bool hyfi_ecm_port_matches(const struct hyfi_ecm_flow_data_t *flow,
-	int32_t to_system_index, int32_t from_system_index);
+	int32_t to_system_index, int32_t from_system_index, const char * br_name);
 
 /**
  * @brief Determine if a device is attached to the HyFi bridge
@@ -128,8 +131,9 @@ bool hyfi_ecm_is_port_on_hyfi_bridge(int32_t system_index);
 /**
  * @brief Determine if the HyFi bridge is attached
  *
- * @return true if the HyFi bridge is attached, false if not
+ * @return Instance of the HyFi bridge that is attached with br_name,
+ *         NULL if not
  */
-bool hyfi_ecm_bridge_attached(void);
+struct hyfi_net_bridge * hyfi_ecm_bridge_attached(const char *br_name);
 
 #endif /* HYFI_ECM_H_ */

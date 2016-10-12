@@ -223,7 +223,8 @@ static u_int32_t hyfi_ecm_calculate_weighted_average(u_int32_t new_rate,
 
 int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int32_t hash,
 	u_int8_t *da, u_int8_t *sa, u_int64_t num_bytes, u_int64_t num_packets,
-	u_int32_t time_now, bool *should_keep_on_fdb_update, u_int32_t *new_elapsed_time)
+	u_int32_t time_now, bool *should_keep_on_fdb_update, u_int32_t *new_elapsed_time,
+	const char *br_name)
 {
 	struct net_hatbl_entry *ha = NULL;
 	struct hyfi_net_bridge *hyfi_br;
@@ -236,7 +237,8 @@ int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int32_t has
 	if(!flow)
 		return -1;
 
-	if (!hyfi_ecm_bridge_attached()) {
+	hyfi_br = hyfi_ecm_bridge_attached(br_name);
+	if (!hyfi_br) {
 		/* Hy-Fi bridge not attached */
 		return 2;
 	}
@@ -323,7 +325,8 @@ int hyfi_ecm_update_stats(const struct hyfi_ecm_flow_data_t *flow, u_int32_t has
 
 EXPORT_SYMBOL(hyfi_ecm_update_stats);
 
-void hyfi_ecm_decelerate(u_int32_t hash, u_int32_t ecm_serial, u_int8_t *da)
+void hyfi_ecm_decelerate(u_int32_t hash, u_int32_t ecm_serial, u_int8_t *da,
+	const char *br_name)
 {
 	struct net_hatbl_entry *ha = NULL;
 	struct hyfi_net_bridge *hyfi_br = NULL;
@@ -333,8 +336,8 @@ void hyfi_ecm_decelerate(u_int32_t hash, u_int32_t ecm_serial, u_int8_t *da)
 	 * For now hyfi_ecm_bridge_attached will return 0, as ecm is not
 	 * supported with hyfi multipe bridges.
 	 */
-
-	if (!hyfi_ecm_bridge_attached()) {
+	hyfi_br = hyfi_ecm_bridge_attached(br_name);
+	if (!hyfi_br) {
 		/* Hy-Fi bridge not attached */
 		return;
 	}
@@ -356,7 +359,8 @@ void hyfi_ecm_decelerate(u_int32_t hash, u_int32_t ecm_serial, u_int8_t *da)
 
 EXPORT_SYMBOL(hyfi_ecm_decelerate);
 
-bool hyfi_ecm_should_keep(const struct hyfi_ecm_flow_data_t *flow, uint8_t *mac)
+bool hyfi_ecm_should_keep(const struct hyfi_ecm_flow_data_t *flow, uint8_t *mac,
+	const char *br_name)
 {
 	if (!memcmp(&flow->da[0], mac, ETH_ALEN)) {
 		/* Need to check the forward */
@@ -370,7 +374,7 @@ bool hyfi_ecm_should_keep(const struct hyfi_ecm_flow_data_t *flow, uint8_t *mac)
 EXPORT_SYMBOL(hyfi_ecm_should_keep);
 
 bool hyfi_ecm_port_matches(const struct hyfi_ecm_flow_data_t *flow,
-	int32_t to_system_index, int32_t from_system_index)
+	int32_t to_system_index, int32_t from_system_index, const char *br_name)
 {
 	struct net_hatbl_entry *ha = NULL;
 	struct hyfi_net_bridge *hyfi_br;
@@ -378,7 +382,8 @@ bool hyfi_ecm_port_matches(const struct hyfi_ecm_flow_data_t *flow,
 	bool ret = false;
 	bool unlock_bh;
 
-	if (!hyfi_ecm_bridge_attached()) {
+	hyfi_br = hyfi_ecm_bridge_attached(br_name);
+	if (!hyfi_br) {
 		/* Hy-Fi bridge not attached */
 		return true;
 	}
@@ -448,11 +453,6 @@ bool hyfi_ecm_is_port_on_hyfi_bridge(int32_t system_index)
 	struct net_device *dev;
 	bool ret = false;
 
-	if (!hyfi_ecm_bridge_attached()) {
-		/* Hy-Fi bridge not attached */
-		return ret;
-	}
-
 	rcu_read_lock();
 	dev = dev_get_by_index_rcu(&init_net, system_index);
 	if (dev) {
@@ -469,9 +469,15 @@ bool hyfi_ecm_is_port_on_hyfi_bridge(int32_t system_index)
 
 EXPORT_SYMBOL(hyfi_ecm_is_port_on_hyfi_bridge);
 
-bool hyfi_ecm_bridge_attached(void)
+struct hyfi_net_bridge * hyfi_ecm_bridge_attached(const char *br_name)
 {
-	return false;
+	struct net_device *br_dev = NULL;
+
+	br_dev = dev_get_by_name(&init_net, br_name);
+	if (br_dev)
+		return hyfi_bridge_get_by_dev(br_dev);
+	else
+		return NULL;
 }
 
 EXPORT_SYMBOL(hyfi_ecm_bridge_attached);
