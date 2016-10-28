@@ -471,7 +471,6 @@ EXPORT_SYMBOL(hyfi_ecm_is_port_on_hyfi_bridge);
 
 bool hyfi_ecm_bridge_attached(void)
 {
-	printk("%s:ecm unsupported with multiple hyfi bridges\n", __FUNCTION__);
 	return false;
 }
 
