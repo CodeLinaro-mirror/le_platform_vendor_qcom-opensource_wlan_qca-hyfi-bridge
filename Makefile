@@ -29,7 +29,8 @@ INCLUDES := -I$(CURDIR) \
     -I$(KBUILDPATH)/include/asm \
     -I$(KBUILDPATH)/net/bridge \
     -I$(MDIR)/$(HYFI_NF) \
-    -I$(MDIR)/$(HYFI_MC)
+    -I$(MDIR)/$(HYFI_MC) \
+    -I$(STAGING_DIR)/usr/include/qca-ssdk
 
 export EXTRA_CFLAGS += $(INCLUDES)
 
