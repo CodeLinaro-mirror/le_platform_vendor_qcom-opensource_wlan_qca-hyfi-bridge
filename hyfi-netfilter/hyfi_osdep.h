@@ -20,6 +20,13 @@
 #include <linux/version.h>
 #include <linux/netfilter_bridge.h>
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+static inline int hyfi_handle_local_in(struct net *net, struct sock *sk, struct sk_buff *skb)
+{
+        return netif_receive_skb(skb);
+}
+#endif
+
 static inline int hyfi_br_pass_frame_up(struct sk_buff *skb)
 {
         struct net_device *indev, *brdev = BR_INPUT_SKB_CB(skb)->brdev;
@@ -42,8 +49,13 @@ static inline int hyfi_br_pass_frame_up(struct sk_buff *skb)
         br_drop_fake_rtable(skb);
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+        return NF_HOOK(NFPROTO_BRIDGE, NF_BR_LOCAL_IN, dev_net(indev), NULL,
+                       skb, indev, NULL, hyfi_handle_local_in);
+#else
         return NF_HOOK(NFPROTO_BRIDGE, NF_BR_LOCAL_IN, skb, indev, NULL,
                        netif_receive_skb);
+#endif
 }
 
 

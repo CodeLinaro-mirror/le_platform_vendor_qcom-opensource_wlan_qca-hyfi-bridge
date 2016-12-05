@@ -30,7 +30,23 @@
 #include "mc_netfilter.h"
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+unsigned int hyfi_netfilter_forwarding_hook(void *priv,
+                                            struct sk_buff *skb,
+                                            const struct nf_hook_state *state);
+
+unsigned int hyfi_netfilter_local_out_hook(void *priv,
+                                           struct sk_buff *skb,
+                                           const struct nf_hook_state *state);
+
+unsigned int hyfi_netfilter_local_in_hook(void *priv,
+                                          struct sk_buff *skb,
+                                          const struct nf_hook_state *state);
+
+unsigned int hyfi_netfilter_pre_routing_hook(void *priv,
+                                             struct sk_buff *skb,
+                                             const struct nf_hook_state *state);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
 unsigned int hyfi_netfilter_forwarding_hook( const struct nf_hook_ops *ops, struct sk_buff *skb,
         const struct net_device *in, const struct net_device *out,
         int (*okfn)(struct sk_buff *) );
@@ -71,28 +87,36 @@ struct nf_hook_ops hyfi_hook_ops[] __read_mostly =
             .priority = 1,
             .hooknum = NF_INET_FORWARD,
             .hook = hyfi_netfilter_forwarding_hook,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0))
             .owner = THIS_MODULE,
+#endif
     },
     {
             .pf = NFPROTO_BRIDGE,
             .priority = 1,
             .hooknum = NF_INET_LOCAL_OUT,
             .hook = hyfi_netfilter_local_out_hook,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0))
             .owner = THIS_MODULE,
+#endif
     },
     {
             .pf = NFPROTO_BRIDGE,
             .priority = 1,
             .hooknum = NF_INET_LOCAL_IN,
             .hook = hyfi_netfilter_local_in_hook,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0))
             .owner = THIS_MODULE,
+#endif
     },
     {
             .pf = NFPROTO_BRIDGE,
             .priority = 1,
             .hooknum = NF_INET_PRE_ROUTING,
             .hook = hyfi_netfilter_pre_routing_hook,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0))
             .owner = THIS_MODULE,
+#endif
     }
 };
 
@@ -104,7 +128,11 @@ struct nf_hook_ops hyfi_hook_ops[] __read_mostly =
 */
 
 #define IEEE1905_MULTICAST_ADDR     "\x01\x80\xC2\x00\x00\x13" /* IEEE 1905.1 Multicast address */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+unsigned int hyfi_netfilter_forwarding_hook(void *priv,
+                                            struct sk_buff *skb,
+                                            const struct nf_hook_state *state)
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
 unsigned int hyfi_netfilter_forwarding_hook(const struct nf_hook_ops *ops,
 		struct sk_buff *skb, const struct net_device *in,
 		const struct net_device *out, int (*okfn)(struct sk_buff *))
@@ -114,6 +142,10 @@ unsigned int hyfi_netfilter_forwarding_hook(unsigned int hooknum,
 		const struct net_device *out, int (*okfn)(struct sk_buff *))
 #endif
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+        const struct net_device *in = state->in;
+        const struct net_device *out = state->out;
+#endif
 	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(out);
 	struct net_bridge_port *br_port = hyfi_br_port_get(out);
 	struct hyfi_net_bridge_port *hyfi_dst_p;
@@ -155,7 +187,9 @@ unsigned int hyfi_netfilter_forwarding_hook(unsigned int hooknum,
 	}
 
 #ifndef HYFI_MC_STANDALONE_NF
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+	return mc_forward_hook(priv, skb, state);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
 	return mc_forward_hook(ops, skb, in, out, okfn);
 #else
 	return mc_forward_hook(hooknum, skb, in, out, okfn);
@@ -165,7 +199,11 @@ unsigned int hyfi_netfilter_forwarding_hook(unsigned int hooknum,
 #endif
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+unsigned int hyfi_netfilter_local_out_hook(void *priv,
+                                           struct sk_buff *skb,
+                                           const struct nf_hook_state *state)
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
 unsigned int hyfi_netfilter_local_out_hook(const struct nf_hook_ops *ops,
         struct sk_buff *skb, const struct net_device *in,
         const struct net_device *out, int (*okfn)(struct sk_buff *))
@@ -175,9 +213,12 @@ unsigned int hyfi_netfilter_local_out_hook(unsigned int hooknum,
         const struct net_device *out, int (*okfn)(struct sk_buff *))
 #endif
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+    const struct net_device *out = state->out;
+#endif
     struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(out);
     struct net_bridge_port *br_port = hyfi_br_port_get(out);
-	struct hyfi_net_bridge_port *hyfi_p = hyfi_bridge_get_port(br_port);
+    struct hyfi_net_bridge_port *hyfi_p = hyfi_bridge_get_port(br_port);
 
     if (unlikely(!hyfi_br || !br_port || !hyfi_p)) {
         return NF_ACCEPT;
@@ -203,7 +244,11 @@ unsigned int hyfi_netfilter_local_out_hook(unsigned int hooknum,
 	return NF_ACCEPT;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+unsigned int hyfi_netfilter_local_in_hook(void *priv,
+                                          struct sk_buff *skb,
+                                          const struct nf_hook_state *state)
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
 unsigned int hyfi_netfilter_local_in_hook(const struct nf_hook_ops *ops,
 		struct sk_buff *skb, const struct net_device *in,
 		const struct net_device *out, int (*okfn)(struct sk_buff *))
@@ -213,6 +258,9 @@ unsigned int hyfi_netfilter_local_in_hook(unsigned int hooknum,
 		const struct net_device *out, int (*okfn)(struct sk_buff *))
 #endif
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+        const struct net_device *in = state->in;
+#endif
 	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(in);
 	struct net_device *br_dev;
 
@@ -224,9 +272,8 @@ unsigned int hyfi_netfilter_local_in_hook(unsigned int hooknum,
 		return NF_ACCEPT;
 
 	/* Is it an IEEE1905.1/LLDP/HCP packet? */
-	if (unlikely(
-			hyfi_ieee1905_frame_filter(skb, in) || hyfi_is_lldp_pkt(skb)
-					|| hyfi_hcp_frame_filter(skb, in))) {
+	if (unlikely(hyfi_ieee1905_frame_filter(skb, in) || hyfi_is_lldp_pkt(skb)
+			|| hyfi_hcp_frame_filter(skb, in))) {
 
 		if (likely(hyfi_br)) {
 			struct sk_buff *skb2 = skb_clone(skb, GFP_ATOMIC);
@@ -243,7 +290,11 @@ unsigned int hyfi_netfilter_local_in_hook(unsigned int hooknum,
 	return NF_ACCEPT;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+unsigned int hyfi_netfilter_pre_routing_hook(void *priv,
+                                             struct sk_buff *skb,
+                                             const struct nf_hook_state *state)
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
 unsigned int hyfi_netfilter_pre_routing_hook(const struct nf_hook_ops *ops,
 		struct sk_buff *skb, const struct net_device *in,
 		const struct net_device *out, int (*okfn)(struct sk_buff *))
@@ -253,6 +304,9 @@ unsigned int hyfi_netfilter_pre_routing_hook(unsigned int hooknum,
 		const struct net_device *out, int (*okfn)(struct sk_buff *))
 #endif
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+        const struct net_device *in = state->in;
+#endif
 	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(in);
 	struct net_bridge_port *br_port = hyfi_br_port_get(in);
 	struct hyfi_net_bridge_port *hyfi_p  = hyfi_bridge_get_port(br_port);
@@ -306,7 +360,9 @@ unsigned int hyfi_netfilter_pre_routing_hook(unsigned int hooknum,
 
 	out:
 #ifndef HYFI_MC_STANDALONE_NF
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+	return mc_pre_routing_hook(priv, skb, state);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
 	return mc_pre_routing_hook(ops, skb, in, out, okfn);
 #else
 	return mc_pre_routing_hook(hooknum, skb, in, out, okfn);

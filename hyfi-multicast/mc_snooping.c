@@ -35,6 +35,13 @@
 #include "mc_forward.h"
 #include "hyfi_bridge.h"
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+static inline int hyfi_handle_local_out(struct net *net, struct sock *sk, struct sk_buff *skb)
+{
+    return dev_queue_xmit(skb);
+}
+#endif
+
 int mc_group_hash(__be32 mdb_salt, __be32 group)
 {
     __be32 key = get_unaligned(&group);
@@ -267,8 +274,13 @@ static void mc_send_query(struct mc_struct *mc, void *port,
     MC_PRINT("%s: Send query to port %s to client "MC_MAC_STR" \n", 
             __func__,  skb->dev->name, MC_MAC_FMT(mac));
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+    NF_HOOK(PF_BRIDGE, NF_BR_LOCAL_OUT, dev_net(skb->dev), NULL,
+            skb, NULL, skb->dev, hyfi_handle_local_out);
+#else
     NF_HOOK(PF_BRIDGE, NF_BR_LOCAL_OUT, skb, NULL, skb->dev,
             dev_queue_xmit);
+#endif
 }
 
 static void mc_ipv4_rp_reset(struct mc_struct *mc, struct mc_router_port *rp)
