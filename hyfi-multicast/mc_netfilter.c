@@ -41,7 +41,11 @@ static struct net_bridge_port *mc_br_port_get(int ifindex)
     return bp;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+HYFI_MC_STATIC unsigned int mc_pre_routing_hook(void *priv,
+                                                struct sk_buff *skb,
+                                                const struct nf_hook_state *state)
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
 HYFI_MC_STATIC unsigned int mc_pre_routing_hook(const struct nf_hook_ops *ops, struct sk_buff *skb,
         const struct net_device *in, const struct net_device *out,
         int(*okfn)(struct sk_buff *))
@@ -51,7 +55,10 @@ HYFI_MC_STATIC unsigned int mc_pre_routing_hook(unsigned int hooknum, struct sk_
         int(*okfn)(struct sk_buff *))
 #endif
 { 
-	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(in);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+    const struct net_device *in = state->in;
+#endif
+    struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(in);
     struct mc_struct *mc = MC_DEV(hyfi_br);
     struct ethhdr *eh = eth_hdr(skb);
     struct net_bridge_port *port;
@@ -101,7 +108,11 @@ out:
     return NF_ACCEPT;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+HYFI_MC_STATIC unsigned int mc_forward_hook(void *priv,
+                                            struct sk_buff *skb,
+                                            const struct nf_hook_state *state)
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0))
 HYFI_MC_STATIC unsigned int mc_forward_hook(const struct nf_hook_ops *ops, struct sk_buff *skb,
         const struct net_device *in, const struct net_device *out,
         int(*okfn)(struct sk_buff *))
@@ -111,9 +122,13 @@ HYFI_MC_STATIC unsigned int mc_forward_hook(unsigned int hooknum, struct sk_buff
         int(*okfn)(struct sk_buff *))
 #endif
 { 
-	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(out);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
+    const struct net_device *in = state->in;
+    const struct net_device *out = state->out;
+#endif
+    struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(out);
     struct mc_struct *mc = MC_DEV(hyfi_br);
-	struct hlist_head *rhead = NULL;
+    struct hlist_head *rhead = NULL;
     struct net_bridge_port *port;
     struct mc_mdb_entry *mdb = MC_SKB_CB(skb)->mdb;
 
@@ -174,14 +189,18 @@ static struct nf_hook_ops mc_hook_ops[] __read_mostly =
         .priority = 1,
         .hooknum = NF_BR_PRE_ROUTING,
         .hook = mc_pre_routing_hook,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0))
         .owner = THIS_MODULE,
+#endif
 	},
 	{
         .pf = NFPROTO_BRIDGE,
         .priority = 1,
         .hooknum = NF_BR_FORWARD,
         .hook = mc_forward_hook,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0))
         .owner = THIS_MODULE,
+#endif
 	}
 };
 #endif
