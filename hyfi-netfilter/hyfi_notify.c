@@ -110,11 +110,15 @@ static int hyfi_device_event(struct notifier_block *unused, unsigned long event,
 	switch (event) {
 	case NETDEV_UP:
 	case NETDEV_DOWN:
+		device_event = (event == NETDEV_UP) ?
+			HYFI_EVENT_LINK_UP : HYFI_EVENT_LINK_DOWN;
+		/* Send a link change notification */
+		hyfi_netlink_event_send(hyfi_br, device_event, sizeof(u_int32_t), p);
+		break;
 	case NETDEV_CHANGE:
 		device_event =
 				netif_carrier_ok(dev) ?
-						HYFI_EVENT_LINK_UP : HYFI_EVENT_LINK_DOWN;
-
+			HYFI_EVENT_LINK_UP : HYFI_EVENT_LINK_DOWN;
 		/* Send a link change notification */
 		hyfi_netlink_event_send(hyfi_br, device_event, sizeof(u_int32_t), p);
 		break;
