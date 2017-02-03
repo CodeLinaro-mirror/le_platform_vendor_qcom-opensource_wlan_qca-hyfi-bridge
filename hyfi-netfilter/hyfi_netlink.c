@@ -142,9 +142,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 					DEBUG_ERROR("Not a Hy-Fi device, or device not found: %s\n",
 							hymsghdr->if_name);
 					hymsghdr->status = HYFI_STATUS_NOT_FOUND;
-					if (brdev)
-						dev_put(brdev);
-					break;
+					goto done;
 				}
 			}
 
