@@ -236,7 +236,10 @@ unsigned int hyfi_netfilter_local_out_hook(unsigned int hooknum,
 	} else {
 		if (!os_br_fdb_get(br_port->br, eth_hdr(skb)->h_dest)) {
 			if (!hyfi_bridge_should_flood(hyfi_p, skb)) {
-				return NF_DROP;
+				/* Don't drop Homeplug control packets */
+				if(!(htons(eth_hdr(skb)->h_proto) == HOMEPLUG)) {
+					return NF_DROP;
+				}
 			}
 		}
 	}

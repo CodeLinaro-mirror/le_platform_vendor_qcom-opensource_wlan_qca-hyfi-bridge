@@ -27,6 +27,7 @@
 #define IPPROTO_ETHERIP (97)
 #endif
 
+#define HOMEPLUG 0x88E1
 #define HYFI_AGGR_REORD_FLUSH_QUOTA 2
 #define HYFI_BRIDGE_MAX 2 /* max number of hyfi bridges supported */
 
