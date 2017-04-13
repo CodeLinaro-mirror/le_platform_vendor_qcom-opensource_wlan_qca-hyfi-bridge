@@ -488,6 +488,21 @@ static struct net_bridge_port *hyfi_bridge_get_dst_port(
 			traffic_class, priority);
 
 	if (ha) {
+		u_int32_t ha_flag = hyfi_ha_has_flag(ha, HYFI_HDTBL_STATIC_ENTRY);
+		if (ha_flag) {
+			hd = __hyfi_hdtbl_get(hyfi_br, dest_addr);
+			if (hd) {
+				u_int32_t hd_flag = hyfi_hd_has_flag(hd, HYFI_HDTBL_STATIC_ENTRY);
+				if (hd_flag != ha_flag) {
+					if (hd_flag == 1) {
+						hyfi_ha_set_flag(ha, HYFI_HDTBL_STATIC_ENTRY);
+					} else {
+						hyfi_ha_clear_flag(ha, HYFI_HDTBL_STATIC_ENTRY);
+					}
+				}
+			}
+		}
+
 		if (ha_out) {
 			*ha_out = ha;
 		}
