@@ -898,9 +898,7 @@ int __init hyfi_bridge_init(void)
 {
 	int i;
 	memset(&hyfi_bridges, 0, sizeof(hyfi_bridges));
-
-	strncpy(hyfi_bridges[0].linux_bridge, hyfi_linux_bridge, IFNAMSIZ);
-
+	strlcpy(hyfi_bridges[0].linux_bridge, hyfi_linux_bridge, IFNAMSIZ );
 	hyfi_hatbl_init();
 	if (hyfi_hdtbl_init()) {
 		hyfi_hatbl_free();
