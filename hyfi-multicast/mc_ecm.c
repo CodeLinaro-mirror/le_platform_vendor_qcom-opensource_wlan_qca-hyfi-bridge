@@ -72,7 +72,7 @@ static int hyfi_bridge_if_source_filter(struct mc_mdb_entry *mdb, uint32_t ifind
 #ifdef HYBRID_MC_MLD
             else {
                 struct in6_addr *ip6 = &mc_source->u.ip6;
-                struct in6_addr *srcs = (struct in6_addr *)fg->a.nsrcs;
+                struct in6_addr *srcs = (struct in6_addr *)fg->a.srcs;
                 for (i = 0; i < fg->a.nsrcs; i++) {
                     if (!ipv6_addr_cmp(&srcs[i], ip6))
                         break;

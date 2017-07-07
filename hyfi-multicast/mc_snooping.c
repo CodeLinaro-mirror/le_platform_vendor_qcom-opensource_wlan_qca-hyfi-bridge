@@ -323,7 +323,7 @@ static struct mc_querier_entry *mc_querier_entry_find(struct hlist_head *head, v
     struct mc_querier_entry *qe;
 
     os_hlist_for_each_entry_rcu(qe, h, head, rlist) {
-        if ((__be32)port == (__be32)qe->port)
+        if (port == qe->port)
             return qe;
     }
     return NULL;
@@ -418,7 +418,7 @@ static struct mc_port_group *mc_port_group_find(struct hlist_head *head,
     struct mc_port_group *pg;
 
     os_hlist_for_each_entry_rcu(pg, h, head, pslist) {
-        if ((__be32)port == (__be32)pg->port)
+        if (port == pg->port)
             return pg;
     }
     return NULL;
