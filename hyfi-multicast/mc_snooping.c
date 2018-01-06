@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2016, 2018 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -317,7 +317,7 @@ static void mc_ipv6_rp_reset(struct mc_struct *mc, struct mc_router_port *rp)
 }
 #endif
 
-static struct mc_querier_entry *mc_querier_entry_find(struct hlist_head *head, void *port)
+static struct mc_querier_entry *mc_querier_entry_find(struct hlist_head *head, const void *port)
 {
     struct hlist_node *h;
     struct mc_querier_entry *qe;
@@ -344,7 +344,7 @@ static void mc_querier_entry_destroy(struct mc_querier_entry *qe)
 }
 
 static struct mc_querier_entry *mc_querier_entry_create(struct hlist_head *head,
-        void *port, struct mc_ip *sip)
+        const void *port, struct mc_ip *sip)
 {
     struct mc_querier_entry *qe = NULL;
 
@@ -412,7 +412,7 @@ static struct mc_fdb_group *mc_fdb_group_create(struct mc_port_group *pg,
 }
 
 static struct mc_port_group *mc_port_group_find(struct hlist_head *head,
-        void *port)
+        const void *port)
 {
     struct hlist_node *h;
     struct mc_port_group *pg;
@@ -446,7 +446,7 @@ static void mc_port_group_destroy(struct mc_port_group *pg)
     call_rcu(&pg->rcu, mc_port_group_rcu_free);
 }
 
-static struct mc_port_group *mc_port_group_create(struct mc_mdb_entry *mdb, void *port)
+static struct mc_port_group *mc_port_group_create(struct mc_mdb_entry *mdb, const void *port)
 {
     struct mc_port_group *pg;
     struct net_bridge_port *p = (struct net_bridge_port *)port;
@@ -593,15 +593,15 @@ static struct mc_mdb_entry *mc_mdb_create(struct mc_struct *mc,
 }
 
 static struct mc_fdb_group *mc_fdb_group_get(struct mc_struct *mc,  
-        struct mc_ip *group, struct sk_buff *skb)
+        struct mc_ip *group, struct sk_buff *skb,
+        struct net_bridge_fdb_entry *fdb,
+        const struct net_bridge_port *port)
 {
     struct mc_mdb_entry *mdb;
     struct mc_port_group *pg;
     struct mc_fdb_group *fg;
     struct hlist_head *head = 
         &mc->hash[mc_group_hash(mc->salt, group->u.ip4)];
-    struct net_bridge_port *port = MC_SKB_CB(skb)->port;
-    struct net_bridge_fdb_entry *fdb = MC_SKB_CB(skb)->fdb;
 
     mdb = mc_mdb_find(head, group);
     if (!mdb) {
@@ -627,7 +627,7 @@ static struct mc_fdb_group *mc_fdb_group_get(struct mc_struct *mc,
 
 static struct mc_fdb_group *mc_update_hybrid_fdb_group(struct mc_struct *mc,
         struct hlist_head *pslist, 
-        __u8 *mac, __be32 now, struct net_bridge_port *port)
+        __u8 *mac, unsigned long now, const struct net_bridge_port *port)
 {
     struct mc_port_group *pg;
     struct hlist_node *pgh;
@@ -664,16 +664,16 @@ static struct mc_fdb_group *mc_update_hybrid_fdb_group(struct mc_struct *mc,
 }
 
 static struct mc_fdb_group *mc_update_mdb(struct mc_struct *mc, 
-        struct mc_ip *group, struct sk_buff *skb)
+        struct mc_ip *group, struct sk_buff *skb,
+        struct net_bridge_fdb_entry *fdb,
+        const struct net_bridge_port *port)
 {
-    __be32 now = jiffies;
+    unsigned long now = jiffies;
     struct mc_mdb_entry *mdb;
     struct mc_port_group *pg;
     struct mc_fdb_group *fg;
     struct hlist_head *head = 
         &mc->hash[mc_group_hash(mc->salt, group->u.ip4)];
-    struct net_bridge_port *port = MC_SKB_CB(skb)->port;
-    struct net_bridge_fdb_entry *fdb = MC_SKB_CB(skb)->fdb;
 
     mdb = mc_mdb_find(head, group);
     if (!mdb) {
@@ -724,7 +724,9 @@ static struct mc_fdb_group *mc_update_mdb(struct mc_struct *mc,
 }
 
 static struct mc_fdb_group *mc_ipv4_report(struct mc_struct *mc, 
-        __be32 group, struct sk_buff *skb)
+        __be32 group, struct sk_buff *skb,
+        struct net_bridge_fdb_entry *fdb,
+        const struct net_bridge_port *port)
 {
     struct mc_ip mc_group;
 
@@ -737,9 +739,9 @@ static struct mc_fdb_group *mc_ipv4_report(struct mc_struct *mc,
 
     MC_PRINT("%s: Rcv group "MC_IP4_STR" report from "MC_MAC_STR"\n", __func__, 
             MC_IP4_FMT((u8 *)&group), 
-            MC_MAC_FMT(((struct net_bridge_fdb_entry *)(MC_SKB_CB(skb)->fdb))->addr.addr));
+            MC_MAC_FMT(fdb->addr.addr));
 
-    return mc_update_mdb(mc, &mc_group, skb);
+    return mc_update_mdb(mc, &mc_group, skb, fdb, port);
 }
 
 #ifdef HYBRID_MC_MLD
@@ -750,7 +752,8 @@ static inline int ipv6_is_local_multicast(const struct in6_addr *addr)
 }
 
 static struct mc_fdb_group *mc_ipv6_report(struct mc_struct *mc, 
-        const struct in6_addr *group, struct sk_buff *skb)
+        const struct in6_addr *group, struct sk_buff *skb,
+        struct net_bridge_fdb_entry *fdb, const struct net_bridge_port *port)
 { 
     struct mc_ip mc_group;
 
@@ -769,9 +772,9 @@ static struct mc_fdb_group *mc_ipv6_report(struct mc_struct *mc,
 
     MC_PRINT("%s: Rcv group "MC_IP6_STR" report from "MC_MAC_STR"\n", __func__,
             MC_IP6_FMT((__be16 *)&mc_group),
-            MC_MAC_FMT(((struct net_bridge_fdb_entry *)(MC_SKB_CB(skb)->fdb))->addr.addr));
+            MC_MAC_FMT(fdb->addr.addr));
 
-    return mc_update_mdb(mc, &mc_group, skb);
+    return mc_update_mdb(mc, &mc_group, skb, fdb, port);
 }
 
 static int mc_ipv6_filter_source(struct mc_fdb_group *fg, struct in6_addr *sip)
@@ -938,12 +941,14 @@ static int mc_ipv4_mix_source(__be32 *a, __be32 a_cnt, __be32 *b, __be32 b_cnt)
 }
 
 static void mc_leave_group(struct mc_struct *mc,
-                     struct mc_ip *group, struct sk_buff *skb)
+                     struct mc_ip *group, struct sk_buff *skb,
+                     struct net_bridge_fdb_entry *fdb,
+                     const struct net_bridge_port *port)
 {
     struct mc_fdb_group *fg;
     struct mc_mdb_entry *mdb;
 
-    fg = mc_fdb_group_get(mc, group, skb);
+    fg = mc_fdb_group_get(mc, group, skb, fdb, port);
     if (fg) {
         spin_lock_bh(&mc->lock);
         mdb = fg->pg->mdb;
@@ -957,7 +962,8 @@ static void mc_leave_group(struct mc_struct *mc,
 }
 
 static void mc_ipv4_leave_group(struct mc_struct *mc,
-                     __be32 group, struct sk_buff *skb)
+                     __be32 group, struct sk_buff *skb,
+                     struct net_bridge_fdb_entry *fdb, const struct net_bridge_port *port)
 {
     struct mc_ip br_group;
  
@@ -965,19 +971,20 @@ static void mc_ipv4_leave_group(struct mc_struct *mc,
         return;
 
     MC_PRINT("%s: "MC_MAC_STR" leave group "MC_IP4_STR"\n", __func__, 
-            MC_MAC_FMT(((struct net_bridge_fdb_entry *)(MC_SKB_CB(skb)->fdb))->addr.addr), 
+            MC_MAC_FMT(fdb->addr.addr), 
             MC_IP4_FMT((u8 *)&group));
 
     memset(&br_group, 0, sizeof(br_group));
     br_group.u.ip4 = group;
     br_group.pro = htons(ETH_P_IP);
 
-    mc_leave_group(mc, &br_group, skb);
+    mc_leave_group(mc, &br_group, skb, fdb, port);
 }
 
 #ifdef HYBRID_MC_MLD
 static void mc_ipv6_leave_group(struct mc_struct *mc,
-        const struct in6_addr *group, struct sk_buff *skb)
+        const struct in6_addr *group, struct sk_buff *skb,
+        struct net_bridge_fdb_entry *fdb, const struct net_bridge_port *port)
 {
     struct mc_ip br_group;
 
@@ -989,10 +996,10 @@ static void mc_ipv6_leave_group(struct mc_struct *mc,
     br_group.pro = htons(ETH_P_IPV6);
 
     MC_PRINT("%s: "MC_MAC_STR" leave group "MC_IP6_STR"\n", __func__, 
-            MC_MAC_FMT(((struct net_bridge_fdb_entry *)(MC_SKB_CB(skb)->fdb))->addr.addr), 
+            MC_MAC_FMT(fdb->addr.addr), 
             MC_IP6_FMT((__be16 *)&br_group));
 
-    mc_leave_group(mc, &br_group, skb);
+    mc_leave_group(mc, &br_group, skb, fdb, port);
 }
 #endif
 
@@ -1252,7 +1259,8 @@ static int mc_ipv4_source_list_filter(struct mc_mdb_entry *mdb,
  *                                                   Send Q(G)
  */
 static int mc_ipv4_igmp3_report(struct mc_struct *mc,
-        struct sk_buff *skb)
+        struct sk_buff *skb, struct net_bridge_fdb_entry *fdb,
+        const struct net_bridge_port *port)
 {
     struct igmpv3_report *ih;
     struct igmpv3_grec *grec;
@@ -1289,7 +1297,7 @@ static int mc_ipv4_igmp3_report(struct mc_struct *mc,
         MC_SKB_CB(skb)->type = MC_REPORT;
         if (mc_find_acl_rule(&mc->igmp_acl, group, NULL, 
                     eh->h_dest, MC_ACL_RULE_NON_SNOOPING) < 0 ||
-                !(fg = mc_ipv4_report(mc, group, skb)) ||
+                !(fg = mc_ipv4_report(mc, group, skb, fdb, port)) ||
                 !(mdb = MC_SKB_CB(skb)->mdb)) {
             prev_offset = len;
             continue;
@@ -1300,7 +1308,7 @@ static int mc_ipv4_igmp3_report(struct mc_struct *mc,
         case IGMPV3_MODE_IS_INCLUDE:
         case IGMPV3_CHANGE_TO_INCLUDE:
             if (!grec->grec_nsrcs) {
-                mc_ipv4_leave_group(mc, group, skb);
+                mc_ipv4_leave_group(mc, group, skb, fdb, port);
                 if (mc->m2i3_filter_enable)
                     filter_num = ~0;
                 break;
@@ -1394,12 +1402,12 @@ static int mc_ipv4_igmp3_report(struct mc_struct *mc,
             break;
         case IGMPV3_BLOCK_OLD_SOURCES:
             if (!fg->filter_mode) {
-                mc_ipv4_leave_group(mc, group, skb);
+                mc_ipv4_leave_group(mc, group, skb, fdb, port);
             } else {
                 mc_source_list_update(fg, (__u8 *)grec->grec_src, MC_GREC_NSRCS(ntohs(grec->grec_nsrcs)), 
                     sizeof(__be32), 0, IGMPV3_BLOCK_OLD_SOURCES);
                 if (!fg->a.nsrcs)
-                    mc_ipv4_leave_group(mc, group, skb);
+                    mc_ipv4_leave_group(mc, group, skb, fdb, port);
             } 
                 
             spin_lock(&mc->lock);
@@ -1540,7 +1548,8 @@ static int mc_ipv6_source_list_filter(struct mc_mdb_entry *mdb,
     return old_grec_nsrcs - grec_nsrcs;
 }
 
-static int mc_ipv6_mld2_report(struct mc_struct *mc, struct sk_buff *skb)
+static int mc_ipv6_mld2_report(struct mc_struct *mc, struct sk_buff *skb,
+                struct net_bridge_fdb_entry *fdb, const struct net_bridge_port *port)
 {
     struct mld2_report *mh;
     struct mld2_grec *grec;
@@ -1580,7 +1589,7 @@ static int mc_ipv6_mld2_report(struct mc_struct *mc, struct sk_buff *skb)
         MC_SKB_CB(skb)->type = MC_REPORT;
         if (mc_find_acl_rule(&mc->mld_acl, 0, (void *)&grec->grec_mca, 
                     eh->h_dest, MC_ACL_RULE_NON_SNOOPING) < 0 ||
-                !(fg = mc_ipv6_report(mc, &grec->grec_mca, skb)) ||
+                !(fg = mc_ipv6_report(mc, &grec->grec_mca, skb, fdb, port)) ||
                 !(mdb = MC_SKB_CB(skb)->mdb)) {
             prev_offset = len;
             continue;
@@ -1591,7 +1600,7 @@ static int mc_ipv6_mld2_report(struct mc_struct *mc, struct sk_buff *skb)
         case MLD2_MODE_IS_INCLUDE:
         case MLD2_CHANGE_TO_INCLUDE:
             if (!grec->grec_nsrcs) {
-                mc_ipv6_leave_group(mc, &grec->grec_mca, skb);
+                mc_ipv6_leave_group(mc, &grec->grec_mca, skb, fdb, port);
                 if (mc->m2i3_filter_enable)
                     filter_num = ~0;
                 break;
@@ -1683,12 +1692,12 @@ static int mc_ipv6_mld2_report(struct mc_struct *mc, struct sk_buff *skb)
             break;
         case MLD2_BLOCK_OLD_SOURCES:
             if (!fg->filter_mode) {
-                mc_ipv6_leave_group(mc, &grec->grec_mca, skb);
+                mc_ipv6_leave_group(mc, &grec->grec_mca, skb, fdb, port);
             } else {
                 mc_source_list_update(fg, (__u8 *)grec->grec_src, MC_GREC_NSRCS(ntohs(grec->grec_nsrcs)), 
                     sizeof(struct in6_addr), 0, MLD2_BLOCK_OLD_SOURCES);
                 if (!fg->a.nsrcs)
-                    mc_ipv6_leave_group(mc, &grec->grec_mca, skb);
+                    mc_ipv6_leave_group(mc, &grec->grec_mca, skb, fdb, port);
             } 
             
             if (!mdb->filter_mode)
@@ -1815,7 +1824,8 @@ out:
     mc_rtimer_reset(mc);
 }
 
-static void mc_ipv4_query(struct mc_struct *mc, struct sk_buff *skb, void *port)
+static void mc_ipv4_query(struct mc_struct *mc, struct sk_buff *skb,
+                const struct net_bridge_port *port)
 {
     struct iphdr *iph = ip_hdr(skb);
     struct igmphdr *ih = igmp_hdr(skb);
@@ -1831,7 +1841,7 @@ static void mc_ipv4_query(struct mc_struct *mc, struct sk_buff *skb, void *port)
 
     MC_PRINT("%s: Rcv group "MC_IP4_STR" query from port %s\n", __func__, 
             MC_IP4_FMT((u8 *)&iph->saddr), 
-            ((struct net_bridge_port *)port)->dev->name);
+            port->dev->name);
 
     group = ih->group;
             
@@ -1897,7 +1907,8 @@ out:
 }
 
 #ifdef HYBRID_MC_MLD
-static int mc_ipv6_query(struct mc_struct *mc, struct sk_buff *skb, void *port)
+static int mc_ipv6_query(struct mc_struct *mc, struct sk_buff *skb,
+                        const struct net_bridge_port *port)
 {
     struct ipv6hdr *ip6h = ipv6_hdr(skb);
     struct mld_msg *mld = (struct mld_msg *) icmp6_hdr(skb);
@@ -1913,7 +1924,7 @@ static int mc_ipv6_query(struct mc_struct *mc, struct sk_buff *skb, void *port)
 
     MC_PRINT("%s: Rcv group "MC_IP6_STR" query from port %s\n", __func__, 
             MC_IP6_FMT((__be16 *)&ip6h->saddr), 
-            ((struct net_bridge_port *)port)->dev->name);
+            port->dev->name);
         
     if (skb->len == sizeof(*mld)) { /* MLDv1 */
         if (!pskb_may_pull(skb, sizeof(*mld)))
@@ -1978,7 +1989,8 @@ out:
 }
 #endif
 
-static int mc_ipv4_rcv(struct mc_struct *mc, struct sk_buff *skb)
+static int mc_ipv4_rcv(struct mc_struct *mc, struct sk_buff *skb,
+        struct net_bridge_fdb_entry *fdb, const struct net_bridge_port *port)
 {
     int err;
     __be32 len, offset;
@@ -2053,7 +2065,7 @@ static int mc_ipv4_rcv(struct mc_struct *mc, struct sk_buff *skb)
     ih = igmp_hdr(skb2);
 
     if (ih->type != IGMP_HOST_MEMBERSHIP_QUERY && 
-            mc_querier_entry_find(&mc->rp.igmp_rlist, MC_SKB_CB(skb2)->port))
+            mc_querier_entry_find(&mc->rp.igmp_rlist, port))
         goto out;
 
     err = 0;
@@ -2063,7 +2075,7 @@ static int mc_ipv4_rcv(struct mc_struct *mc, struct sk_buff *skb)
         MC_SKB_CB(skb)->type = MC_REPORT;
         if (MC_SKB_CB(skb)->non_snoop)
             break;
-        if (mc_ipv4_report(mc, ih->group, skb) == NULL)
+        if (mc_ipv4_report(mc, ih->group, skb, fdb, port) == NULL)
             err = -EINVAL;
         break;
     case IGMPV3_HOST_MEMBERSHIP_REPORT:
@@ -2071,18 +2083,18 @@ static int mc_ipv4_rcv(struct mc_struct *mc, struct sk_buff *skb)
             MC_SKB_CB(skb)->type = MC_REPORT;
             break;
         }
-        err = mc_ipv4_igmp3_report(mc, skb2);
+        err = mc_ipv4_igmp3_report(mc, skb2, fdb, port);
         MC_SKB_CB(skb)->mdb = MC_SKB_CB(skb2)->mdb;
         MC_SKB_CB(skb)->type = MC_SKB_CB(skb2)->type;
         break;
     case IGMP_HOST_MEMBERSHIP_QUERY:
-        mc_ipv4_query(mc, skb2, MC_SKB_CB(skb)->port);
+        mc_ipv4_query(mc, skb2, port);
         break;
     case IGMP_HOST_LEAVE_MESSAGE:
         MC_SKB_CB(skb)->type = MC_LEAVE;
         if (MC_SKB_CB(skb)->non_snoop)
             break;
-        mc_ipv4_leave_group(mc, ih->group, skb);
+        mc_ipv4_leave_group(mc, ih->group, skb, fdb, port);
         break;
     }
 
@@ -2096,7 +2108,8 @@ inhdr_error:
 }
 
 #ifdef HYBRID_MC_MLD
-static int mc_ipv6_rcv(struct mc_struct *mc, struct sk_buff *skb)
+static int mc_ipv6_rcv(struct mc_struct *mc, struct sk_buff *skb,
+        struct net_bridge_fdb_entry *fdb, const struct net_bridge_port *port)
 {
     struct sk_buff *skb2 = skb;
     struct ipv6hdr *ip6h;
@@ -2165,7 +2178,7 @@ static int mc_ipv6_rcv(struct mc_struct *mc, struct sk_buff *skb)
     case ICMPV6_MGM_REDUCTION:
     case ICMPV6_MLD2_REPORT:
         if (icmp6h->icmp6_type != ICMPV6_MGM_QUERY &&
-                mc_querier_entry_find(&mc->rp.mld_rlist, MC_SKB_CB(skb2)->port)) {
+                mc_querier_entry_find(&mc->rp.mld_rlist, port)) {
             err = -EINVAL;
             goto out;
         }
@@ -2211,7 +2224,7 @@ static int mc_ipv6_rcv(struct mc_struct *mc, struct sk_buff *skb)
         MC_SKB_CB(skb)->type = MC_REPORT;
         if (MC_SKB_CB(skb)->non_snoop)
             break;
-        if (mc_ipv6_report(mc, &mld->mld_mca, skb) == NULL)
+        if (mc_ipv6_report(mc, &mld->mld_mca, skb, fdb, port) == NULL)
             err = -EINVAL;
         break;
     case ICMPV6_MLD2_REPORT:
@@ -2219,13 +2232,13 @@ static int mc_ipv6_rcv(struct mc_struct *mc, struct sk_buff *skb)
             MC_SKB_CB(skb)->type = MC_REPORT;
             break;
         }
-        err = mc_ipv6_mld2_report(mc, skb2);
+        err = mc_ipv6_mld2_report(mc, skb2, fdb, port);
         skb->len = skb2->len + offset;
         MC_SKB_CB(skb)->mdb = MC_SKB_CB(skb2)->mdb;
         MC_SKB_CB(skb)->type = MC_SKB_CB(skb2)->type;
         break;
     case ICMPV6_MGM_QUERY:
-        err = mc_ipv6_query(mc, skb2, MC_SKB_CB(skb)->port);
+        err = mc_ipv6_query(mc, skb2, port);
         break;
     case ICMPV6_MGM_REDUCTION:
         {
@@ -2233,7 +2246,7 @@ static int mc_ipv6_rcv(struct mc_struct *mc, struct sk_buff *skb)
         MC_SKB_CB(skb)->type = MC_LEAVE;
         if (MC_SKB_CB(skb)->non_snoop)
             break;
-        mc_ipv6_leave_group(mc, &mld->mld_mca, skb);
+        mc_ipv6_leave_group(mc, &mld->mld_mca, skb, fdb, port);
         }
     }
 
@@ -2377,24 +2390,24 @@ void mc_nbp_change(struct hyfi_net_bridge *hyfi_br,
 /*
  * Called with rcu
  */
-int mc_rcv(struct mc_struct *mc, struct sk_buff *skb)
+int mc_rcv(struct mc_struct *mc, struct sk_buff *skb,
+        struct net_bridge_fdb_entry *fdb, const struct net_bridge_port *port)
 {
     if (!mc || !mc->started) {
         return 0;
     }
 
-    if (!MC_SKB_CB(skb)->fdb ||
-            !MC_SKB_CB(skb)->port) {
+    if (!fdb || !port) {
         return 0;
     }
 
     MC_SKB_CB(skb)->igmp = 0;
     switch (ntohs(skb->protocol)) {
         case ETH_P_IP:
-            return mc_ipv4_rcv(mc, skb);
+            return mc_ipv4_rcv(mc, skb, fdb, port);
 #ifdef HYBRID_MC_MLD
         case ETH_P_IPV6:
-            return mc_ipv6_rcv(mc, skb);
+            return mc_ipv6_rcv(mc, skb, fdb, port);
 #endif
     }
 

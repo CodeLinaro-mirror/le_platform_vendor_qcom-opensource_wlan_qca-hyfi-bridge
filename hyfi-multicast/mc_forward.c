@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014, 2016 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012, 2014, 2016, 2018 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -359,7 +359,7 @@ static int mc_process(const struct net_bridge_port *src, struct sk_buff *skb)
 	struct net_bridge *br;
     struct hyfi_net_bridge *hyfi_br;
     struct mc_struct *mc;
-    void *fdb;
+    struct net_bridge_fdb_entry *fdb;
 
     if (!src) {
     	hyfi_br = hyfi_bridge_get_by_dev(BR_INPUT_SKB_CB(skb)->brdev);
@@ -382,10 +382,7 @@ static int mc_process(const struct net_bridge_port *src, struct sk_buff *skb)
     if (!fdb)
         return -EINVAL;
 
-    MC_SKB_CB(skb)->fdb = fdb;
-    MC_SKB_CB(skb)->port = (void *)src;
-
-    if (mc_rcv(mc, skb)) {
+    if (mc_rcv(mc, skb, fdb, src)) {
         kfree_skb(skb);
         return 0;
     }
