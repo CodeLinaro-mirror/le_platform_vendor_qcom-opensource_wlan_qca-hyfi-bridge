@@ -75,9 +75,8 @@ struct ha_psw_stm_entry {
 	u_int16_t mrk_id;
 };
 
+#ifndef __NET_ETHERNET_H
 #define ETHER_ADDR_LEN 6
-
-#ifndef _NET_ETHERNET_H_
 struct ether_header {
 	u_int8_t ether_dhost[ETHER_ADDR_LEN];
 	u_int8_t ether_shost[ETHER_ADDR_LEN];

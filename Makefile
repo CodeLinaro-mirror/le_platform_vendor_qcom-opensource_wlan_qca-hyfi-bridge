@@ -45,6 +45,14 @@ ifeq ($(strip ${PLC_SUPPORT_NETFILTER}),1)
 ccflags-y+=-DPLC_NF_ENABLE
 endif
 
+ifdef QCA_PARTNER_PLATFORM
+ccflags-y += -DQCA_PARTNER_PLATFORM=1
+endif
+
+ifdef QCA_PARTNER_PLATFORM_LITEPATH_NSS
+ccflags-y += -DQCA_PARTNER_PLATFORM_LITEPATH_NSS=1
+endif
+
 # #############################################################################
 # Debug flags, set these to = 0 if you want to disable all debugging.
 # By turning off debugs you gain maximum performance.

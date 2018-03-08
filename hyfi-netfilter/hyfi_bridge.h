@@ -147,6 +147,11 @@ int hyfi_bridge_init(void);
 
 void hyfi_bridge_fini(void);
 
+#ifdef QCA_PARTNER_PLATFORM
+#if !defined(DEBUG_LEVEL)
+#define DEBUG_LEVEL 1
+#endif
+#endif
 /*
  * The following are debug macros used throughout the Hy-Fi bridge.
  * Each file that #includes this file MUST have a:

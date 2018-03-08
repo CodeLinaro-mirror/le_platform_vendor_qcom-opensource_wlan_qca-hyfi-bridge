@@ -30,8 +30,10 @@
 #include "hyfi_bridge.h"
 #include "hyfi_api.h"
 #include "hyfi_fdb.h"
+#ifndef QCA_PARTNER_PLATFORM
 #include "ref/ref_port_ctrl.h"
 #include "ref/ref_fdb.h"
+#endif
 
 static inline unsigned long hold_time(const struct net_bridge *br)
 {

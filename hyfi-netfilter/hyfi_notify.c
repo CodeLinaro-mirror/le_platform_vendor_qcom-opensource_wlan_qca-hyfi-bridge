@@ -25,8 +25,10 @@
 #include "hyfi_bridge.h"
 #include "hyfi_hatbl.h"
 #include "mc_snooping.h"
+#ifndef QCA_PARTNER_PLATFORM
 #include "ref/ref_port_ctrl.h"
 #include "ref/ref_fdb.h"
+#endif
 
 static int hyfi_device_event(struct notifier_block *unused, unsigned long event,
 		void *ptr);
@@ -34,6 +36,7 @@ static int hyfi_device_event(struct notifier_block *unused, unsigned long event,
 static struct notifier_block hyfi_device_notifier = { .notifier_call =
 		hyfi_device_event };
 
+#ifndef QCA_PARTNER_PLATFORM
 static int hyfi_device_link_event(struct notifier_block *unused, unsigned long event,
                 void *ptr);
 
@@ -72,7 +75,7 @@ static int hyfi_device_link_event(struct notifier_block *unused, unsigned long e
 	}
 	return NOTIFY_DONE;
 }
-
+#endif
 /*
  * Handle changes in state of network devices enslaved to a bridge.
  */
@@ -193,18 +196,21 @@ void hyfi_br_notify(int group, int event, const void *ptr)
 int __init hyfi_notify_init(void)
 {
 	int ret;
+#ifndef QCA_PARTNER_PLATFORM
 	int rval; /* ssdk register status */
+#endif
 	ret = register_netdevice_notifier(&hyfi_device_notifier);
     rcu_assign_pointer(br_notify_hook, hyfi_br_notify);
 
 	if (ret) {
 		DEBUG_ERROR("hyfi: Failed to register to netdevice notifier\n" );
 	}
+#ifndef QCA_PARTNER_PLATFORM
 	rval = ssdk_port_link_notify_register(&hyfi_device_link_notifier);
 	if (ret < 0) {
 		DEBUG_ERROR("hyfi: Failed to register to ssdk_port_link notifier\n" );
 	}
-
+#endif
 	return ret;
 }
 
@@ -212,5 +218,7 @@ void hyfi_notify_fini(void)
 {
 	unregister_netdevice_notifier(&hyfi_device_notifier);
     rcu_assign_pointer(br_notify_hook, NULL);
+#ifndef QCA_PARTNER_PLATFORM
 	ssdk_port_link_notify_unregister(&hyfi_device_link_notifier);
+#endif
 }
