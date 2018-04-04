@@ -219,6 +219,69 @@ out:
 }
 
 /* call with rcu_read_lock() */
+static int mc_rtports_fillbuf(struct mc_struct *mc, void *buf,
+                 __be32 buflen, __be32 *bytes_written, __be32 *bytes_needed)
+{
+    struct __mc_rtport_entry *entry = buf;
+    struct hlist_head *rhead = NULL;
+    int num_entrys, total = 0, num = 0, ret = 0;
+
+    num_entrys = buflen / sizeof(*entry);
+
+    rhead = &mc->rp.igmp_rlist;
+    if (!hlist_empty(rhead)) {
+        struct mc_querier_entry *qe;
+        struct hlist_node *h;
+        os_hlist_for_each_entry_rcu(qe, h, rhead, rlist) {
+            total++;
+            if (num >= num_entrys) {
+                ret =  -EAGAIN;
+                continue;
+
+            }
+            entry->ifindex = ((struct net_bridge_port *)qe->port)->dev->ifindex;
+            entry->ipv4 = 1;
+            num++;
+            entry++;
+        }
+    }
+
+#ifdef MC_SUPPORT_MLD
+    rhead = &mc->rp.mld_rlist;
+    if (!hlist_empty(rhead)) {
+        struct mc_querier_entry *qe;
+        struct hlist_node *h;
+        os_hlist_for_each_entry_rcu(qe, h, rhead, rlist) {
+            total++;
+            if (num >= num_entrys) {
+                ret =  -EAGAIN;
+                continue;
+
+            }
+            entry->ifindex = ((struct net_bridge_port *)(qe->port))->dev->ifindex;
+            entry->ipv4 = 0;
+            num++;
+            entry++;
+        }
+
+    }
+#endif
+
+    if (bytes_written)
+        *bytes_written = num * sizeof(*entry);
+
+    if (bytes_needed) {
+        if (ret == -EAGAIN)
+            *bytes_needed = total * sizeof(*entry);
+        else
+            *bytes_needed = 0;
+    }
+    return ret;
+
+
+}
+
+/* call with rcu_read_lock() */
 static int mc_mdbtbl_fillbuf(struct mc_struct *mc, void *buf, 
         __be32 buflen, __be32 *bytes_written, __be32 *bytes_needed)
 {
@@ -672,6 +735,13 @@ static void mc_netlink_receive(struct sk_buff *__skb)
                     struct __mc_param_value *e = (struct __mc_param_value *)hymsgdata;
                     hyfi_br->multicast_router = e->val;
                     MC_PRINT(KERN_INFO "%s: %s multicast router.\n",__func__, e->val ? "Enable" : "Disable");
+                }
+                break;
+            case HYFI_GET_MC_ROUTER_PORT:
+                {
+                    if (mc_rtports_fillbuf(mc, hymsgdata, hymsghdr->buf_len,
+                                &hymsghdr->bytes_written, &hymsghdr->bytes_needed))
+                        hymsghdr->status = HYFI_STATUS_BUFFER_OVERFLOW;
                 }
                 break;
             default:

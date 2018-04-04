@@ -187,6 +187,47 @@ out:
     dev_put(dev);
 }
 
+/*
+ * mc_do_router_flood
+ * Flood the data to the all ports attached to a router
+ * rhead: igmp_rlist or mld_rlist for the ports query exists
+ * skb: the skb to be delivered.
+ */
+static int mc_do_router_flood(struct mc_mdb_entry *mdb, struct hlist_head *rhead, struct sk_buff *skb)
+{
+    struct mc_querier_entry *qe;
+    struct hlist_node *h;
+    struct sk_buff *skb2;
+    int i = 0;
+
+    os_hlist_for_each_entry_rcu(qe, h, rhead, rlist) {
+
+        /* Avoid to send it twice to the same ports
+         * If port already exist in the mdb table list
+         * go to the next query port.
+         */
+        if (mdb) {
+            for (i = 0; i < mdb->flood_ifcnt; i++) {
+                if (mdb->flood_ifindex[i] ==
+                    ((struct net_bridge_port *)qe->port)->dev->ifindex) {
+                        break;
+                }
+
+            }
+            if (i < mdb->flood_ifcnt) {
+                continue;
+            }
+        }
+        if ((skb2 = skb_clone(skb, GFP_ATOMIC)) == NULL) {
+            return -ENOMEM;
+        }
+        hyfi_br_forward(qe->port, skb2);
+    }
+    return 0;
+
+}
+
+
 static int mc_do_flood(struct mc_mdb_entry *mdb, struct sk_buff *skb, int forward)
 {
     int i;
@@ -247,6 +288,7 @@ static int mc_convert(struct mc_struct *mc, struct sk_buff *skb, int forward)
     struct mc_mdb_entry *mdb;
     void *iph = NULL;
     struct sk_buff *skb2 = NULL;
+    struct hlist_head *rhead = NULL;
     int is_management;
     int passup = 0;
 
@@ -271,6 +313,7 @@ static int mc_convert(struct mc_struct *mc, struct sk_buff *skb, int forward)
                     eh->h_dest, MC_ACL_RULE_MANAGEMENT);
 
             memset(&group, 0, sizeof group);
+            rhead = &mc->rp.igmp_rlist;
             group.u.ip4 = ip->daddr;
             group.pro = htons(ETH_P_IP);
             iph = (void *)ip;
@@ -288,6 +331,7 @@ static int mc_convert(struct mc_struct *mc, struct sk_buff *skb, int forward)
 
             is_management = mc_find_acl_rule(&mc->mld_acl, 0, (void *)&ip6->daddr,
                     eh->h_dest, MC_ACL_RULE_MANAGEMENT);
+            rhead = &mc->rp.mld_rlist;
 
             memset(&group, 0, sizeof group);
             hyfi_ipv6_addr_copy(&group.u.ip6, &ip6->daddr);
@@ -314,6 +358,13 @@ static int mc_convert(struct mc_struct *mc, struct sk_buff *skb, int forward)
     if (!mdb || !atomic_read(&mdb->users)) {
         if (mc->forward_policy == MC_POLICY_FLOOD || is_management)
             goto out;
+
+        /* The packets should be forwarded to the all ports attached to
+         * a router
+         */
+        if (forward && !hlist_empty(rhead)) {
+            mc_do_router_flood(NULL, rhead, skb);
+        }
 
         if (passup) {
             /*multicast router is enabled, passing up for routing*/
@@ -343,6 +394,11 @@ static int mc_convert(struct mc_struct *mc, struct sk_buff *skb, int forward)
         mc_do_encap(mdb, iph, skb2, forward);
     }
 
+    /* The packets should be forwarded to the all ports attached to a router
+     */
+    if (forward && !hlist_empty(rhead)) {
+        mc_do_router_flood(mdb, rhead, skb);
+    }
 
     if (passup)
             hyfi_br_pass_frame_up(skb);

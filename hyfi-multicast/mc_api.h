@@ -43,7 +43,8 @@ enum
     HYFI_SET_MC_EVENT_PID,
     HYFI_GET_MC_ACL,
     HYFI_GET_MC_MDB,
-    HYFI_SET_MC_ROUTER
+    HYFI_SET_MC_ROUTER,
+    HYFI_GET_MC_ROUTER_PORT,
 };
 
 /* netlink event type */
@@ -148,6 +149,11 @@ struct __mc_group
         u_int8_t        ip6[HYFI_MC_IP6_SIZE];
     } u;
 };
+
+struct __mc_rtport_entry {
+    u_int32_t ifindex;
+    u_int32_t ipv4;
+}__attribute__ ((packed));
 
 struct __mc_mdb_entry
 {
