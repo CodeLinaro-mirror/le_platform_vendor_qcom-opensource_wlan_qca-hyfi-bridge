@@ -27,7 +27,11 @@
 #include "hyfi_hdtbl.h"
 #include "hyfi_fdb.h"
 #include "hyfi_netlink.h"
-#ifndef QCA_PARTNER_PLATFORM
+/* ref_port_ctrl.h and ref_fdb.h header file is  platform dependent code and this
+   is not required for 3rd party platform. So avoided this header file inclusion
+   by the flag HYFI_DISABLE_SSDK_SUPPORT
+ */
+#ifndef HYFI_DISABLE_SSDK_SUPPORT
 #include "ref/ref_port_ctrl.h"
 #include "ref/ref_fdb.h"
 #endif
@@ -472,7 +476,10 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				spin_unlock_bh(&br->lock);
 				break;
 			}
-#ifndef QCA_PARTNER_PLATFORM
+/* switch support is not required for 3rd party platform and this is platform dependent code.
+   So avoided this case by using the flag HYFI_DISABLE_SSDK_SUPPORT for 3rd party platform.
+ */
+#ifndef HYFI_DISABLE_SSDK_SUPPORT
 			case HYFI_GET_SWITCH_PORT_ID: {
 				struct __switchport_index *p =hymsgdata;
 				fal_port_t port_id;
@@ -512,11 +519,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 		NETLINK_CB(skb).pid = 0; /* from kernel */
 #endif
 		NETLINK_CB(skb).dst_group = 0; /* unicast */
-#ifdef QCA_PARTNER_PLATFORM_LITEPATH_NSS
-		netlink_unicast(hyfi_nl_sk, skb, pid, MSG_DONTWAIT, GFP_KERNEL);
-#else
                 netlink_unicast(hyfi_nl_sk, skb, pid, MSG_DONTWAIT);
-#endif
 	}
 
 	return;
@@ -528,7 +531,10 @@ void hyfi_netlink_event_send(struct hyfi_net_bridge *br,
 	struct sk_buff *skb;
 	struct nlmsghdr *nlh = NULL;
 	int send_msg = true;
-#ifndef QCA_PARTNER_PLATFORM
+/* ssdk support is platform dependent code and this is not required for 3rd party platform.
+   so avoided the ssdk support by using the flag HYFI_DISABLE_SSDK_SUPPORT.
+ */
+#ifndef HYFI_DISABLE_SSDK_SUPPORT
 	ssdk_port_status *linkStatus = NULL;
 	struct __ssdkport_entry *ssdk_portentry = NULL;
 #endif
@@ -587,7 +593,10 @@ void hyfi_netlink_event_send(struct hyfi_net_bridge *br,
 	case HYFI_EVENT_FDB_UPDATED:
 		/* No data; recipient needs to ask for the updated fdb table */
 		break;
-#ifndef QCA_PARTNER_PLATFORM
+/* ssdk support is platform dependent code and this is not required for 3rd party platform.
+   so avoided the ssdk support by using the flag HYFI_DISABLE_SSDK_SUPPORT.
+ */
+#ifndef HYFI_DISABLE_SSDK_SUPPORT
 	case HYFI_EVENT_LINK_PORT_UP:
 	case HYFI_EVENT_LINK_PORT_DOWN:
 		linkStatus = (ssdk_port_status *)event_data;
@@ -611,11 +620,7 @@ void hyfi_netlink_event_send(struct hyfi_net_bridge *br,
 		NETLINK_CB(skb).pid = 0; /* from kernel */
 #endif
 		NETLINK_CB(skb).dst_group = 0; /* unicast */
-#ifdef QCA_PARTNER_PLATFORM_LITEPATH_NSS
-		netlink_unicast(hyfi_nl_event_sk, skb, br->event_pid, MSG_DONTWAIT, GFP_KERNEL);
-#else
                 netlink_unicast(hyfi_nl_event_sk, skb, br->event_pid, MSG_DONTWAIT);
-#endif
 	}
 
 	return;

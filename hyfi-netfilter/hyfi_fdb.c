@@ -30,7 +30,11 @@
 #include "hyfi_bridge.h"
 #include "hyfi_api.h"
 #include "hyfi_fdb.h"
-#ifndef QCA_PARTNER_PLATFORM
+/* ref_port_ctrl.h and ref_fdb.h header file is  platform dependent code and this
+   is not required for 3rd party platform. So avoided this header file inclusion
+   by the flag HYFI_DISABLE_SSDK_SUPPORT
+ */
+#ifndef HYFI_DISABLE_SSDK_SUPPORT
 #include "ref/ref_port_ctrl.h"
 #include "ref/ref_fdb.h"
 #endif

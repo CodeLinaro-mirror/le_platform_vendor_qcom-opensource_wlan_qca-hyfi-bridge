@@ -25,7 +25,11 @@
 #include "hyfi_bridge.h"
 #include "hyfi_hatbl.h"
 #include "mc_snooping.h"
-#ifndef QCA_PARTNER_PLATFORM
+/* ref_port_ctrl.h and ref_fdb.h header file is  platform dependent code and this
+   is not required for 3rd party platform. So avoided this header file inclusion
+   by the flag HYFI_DISABLE_SSDK_SUPPORT
+ */
+#ifndef HYFI_DISABLE_SSDK_SUPPORT
 #include "ref/ref_port_ctrl.h"
 #include "ref/ref_fdb.h"
 #endif
@@ -35,8 +39,7 @@ static int hyfi_device_event(struct notifier_block *unused, unsigned long event,
 
 static struct notifier_block hyfi_device_notifier = { .notifier_call =
 		hyfi_device_event };
-
-#ifndef QCA_PARTNER_PLATFORM
+#ifndef HYFI_DISABLE_SSDK_SUPPORT
 static int hyfi_device_link_event(struct notifier_block *unused, unsigned long event,
                 void *ptr);
 
@@ -196,17 +199,17 @@ void hyfi_br_notify(int group, int event, const void *ptr)
 int __init hyfi_notify_init(void)
 {
 	int ret;
-#ifndef QCA_PARTNER_PLATFORM
-	int rval; /* ssdk register status */
-#endif
 	ret = register_netdevice_notifier(&hyfi_device_notifier);
     rcu_assign_pointer(br_notify_hook, hyfi_br_notify);
 
 	if (ret) {
 		DEBUG_ERROR("hyfi: Failed to register to netdevice notifier\n" );
 	}
-#ifndef QCA_PARTNER_PLATFORM
-	rval = ssdk_port_link_notify_register(&hyfi_device_link_notifier);
+/* ssdk support is platform dependent code and this is not required for 3rd party platform.
+   so avoided the ssdk support by using the flag HYFI_DISABLE_SSDK_SUPPORT.
+ */
+#ifndef HYFI_DISABLE_SSDK_SUPPORT
+	ret = ssdk_port_link_notify_register(&hyfi_device_link_notifier);
 	if (ret < 0) {
 		DEBUG_ERROR("hyfi: Failed to register to ssdk_port_link notifier\n" );
 	}
@@ -218,7 +221,10 @@ void hyfi_notify_fini(void)
 {
 	unregister_netdevice_notifier(&hyfi_device_notifier);
     rcu_assign_pointer(br_notify_hook, NULL);
-#ifndef QCA_PARTNER_PLATFORM
+/* ssdk support is platform dependent code and this is not required for 3rd party platform.
+   so avoided the ssdk support by using the flag HYFI_DISABLE_SSDK_SUPPORT.
+ */
+#ifndef HYFI_DISABLE_SSDK_SUPPORT
 	ssdk_port_link_notify_unregister(&hyfi_device_link_notifier);
 #endif
 }

@@ -758,11 +758,7 @@ static void mc_netlink_receive(struct sk_buff *__skb)
     NETLINK_CB(skb).pid = 0; /* from kernel */
 #endif
     NETLINK_CB(skb).dst_group = 0; /* unicast */
-#ifdef QCA_PARTNER_PLATFORM_LITEPATH_NSS
-    netlink_unicast(mc_nl_sk, skb, pid, MSG_DONTWAIT, GFP_KERNEL);
-#else
     netlink_unicast(mc_nl_sk, skb, pid, MSG_DONTWAIT);
-#endif
 }
 
 void mc_netlink_event_send(struct mc_struct *mc, u32 event_type, u32 event_len, void *event_data)
@@ -805,11 +801,7 @@ void mc_netlink_event_send(struct mc_struct *mc, u32 event_type, u32 event_len, 
         NETLINK_CB(skb).pid = 0; /* from kernel */
 #endif
         NETLINK_CB(skb).dst_group = 0; /* unicast */
-#ifdef QCA_PARTNER_PLATFORM_LITEPATH_NSS
-        netlink_unicast(mc_nl_event_sk, skb, mc->event_pid, MSG_DONTWAIT, GFP_KERNEL);
-#else
         netlink_unicast(mc_nl_event_sk, skb, mc->event_pid, MSG_DONTWAIT);
-#endif
     }
 }
 

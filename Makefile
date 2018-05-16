@@ -35,7 +35,7 @@ INCLUDES := -I$(CURDIR) \
 export EXTRA_CFLAGS += $(INCLUDES)
 
 # Module extra compilation flags
-EXTRA_CFLAGS += -Werror -Wall -g
+EXTRA_CFLAGS += -Werror -Wall -g $(QCACFLAGS)
 
 ifeq ($(strip ${HYBRID_MC_MLD}),1)
 ccflags-y+=-DHYBRID_MC_MLD
@@ -43,14 +43,6 @@ endif
 
 ifeq ($(strip ${PLC_SUPPORT_NETFILTER}),1)
 ccflags-y+=-DPLC_NF_ENABLE
-endif
-
-ifdef QCA_PARTNER_PLATFORM
-ccflags-y += -DQCA_PARTNER_PLATFORM=1
-endif
-
-ifdef QCA_PARTNER_PLATFORM_LITEPATH_NSS
-ccflags-y += -DQCA_PARTNER_PLATFORM_LITEPATH_NSS=1
 endif
 
 # #############################################################################
