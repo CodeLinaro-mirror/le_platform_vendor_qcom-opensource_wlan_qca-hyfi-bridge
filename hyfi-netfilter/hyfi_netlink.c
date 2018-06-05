@@ -374,6 +374,30 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				break;
 			}
 
+			case HYFI_SET_BRIDGE_FWMODE: {
+				u32 *p = hymsgdata;
+				spin_lock_bh(&br->lock);
+				if (*p == HYFI_BRIDGE_FWMODE_APS) {
+					br->flags &= ~HYFI_BRIDGE_FLAG_FWMODE_NO_HYBRID_TABLES;
+					br->flags &= ~HYFI_BRIDGE_FLAG_FWMODE_MCAST_ONLY;
+				}
+				else if (*p == HYFI_BRIDGE_FWMODE_NO_HYBRID_TABLES) {
+					br->flags |= HYFI_BRIDGE_FLAG_FWMODE_NO_HYBRID_TABLES;
+					br->flags &= ~HYFI_BRIDGE_FLAG_FWMODE_MCAST_ONLY;
+				}
+				else if (*p == HYFI_BRIDGE_FWMODE_MCAST_ONLY) {
+					br->flags &= ~HYFI_BRIDGE_FLAG_FWMODE_NO_HYBRID_TABLES;
+					br->flags |= HYFI_BRIDGE_FLAG_FWMODE_MCAST_ONLY;
+				}
+				else {
+					hymsghdr->status = HYFI_STATUS_INVALID_PARAMETER;
+				}
+				spin_unlock_bh(&br->lock);
+
+				break;
+			}
+
+
 			case HYFI_SET_BRPORT_GROUP: {
 				struct __brport_group *p = hymsgdata;
 				struct net_bridge_port *bp;

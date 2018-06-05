@@ -166,21 +166,23 @@ unsigned int hyfi_netfilter_forwarding_hook(unsigned int hooknum,
 	hyfi_dst_p = hyfi_bridge_get_port(br_port);
 	hyfi_src_p = hyfi_bridge_get_port_by_dev(in);
 
-	/* Should deliver */
-	if (!hyfi_bridge_should_deliver(hyfi_src_p, hyfi_dst_p, skb)) {
-	    return NF_DROP;
-	}
+	if (likely(!hyfi_bridge_is_fwmode_mcast_only(hyfi_br))) {
+		/* Should deliver */
+		if (!hyfi_bridge_should_deliver(hyfi_src_p, hyfi_dst_p, skb)) {
+		    return NF_DROP;
+		}
 
-	/* Should flood */
-	if (!hyfi_br->flags & HYFI_BRIDGE_FLAG_MODE_RELAY_OVERRIDE) {
-		if (unlikely(is_multicast_ether_addr(eth_hdr(skb)->h_dest))) {
-			if (!hyfi_bridge_should_flood(hyfi_dst_p, skb)) {
-				return NF_DROP;
-			}
-		} else {
-			if (!os_br_fdb_get(br_port->br, eth_hdr(skb)->h_dest)) {
+		/* Should flood */
+		if (!hyfi_br->flags & HYFI_BRIDGE_FLAG_MODE_RELAY_OVERRIDE) {
+			if (unlikely(is_multicast_ether_addr(eth_hdr(skb)->h_dest))) {
 				if (!hyfi_bridge_should_flood(hyfi_dst_p, skb)) {
 					return NF_DROP;
+				}
+			} else {
+				if (!os_br_fdb_get(br_port->br, eth_hdr(skb)->h_dest)) {
+					if (!hyfi_bridge_should_flood(hyfi_dst_p, skb)) {
+						return NF_DROP;
+					}
 				}
 			}
 		}
@@ -214,31 +216,33 @@ unsigned int hyfi_netfilter_local_out_hook(unsigned int hooknum,
 #endif
 {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
-    const struct net_device *out = state->out;
+	const struct net_device *out = state->out;
 #endif
-    struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(out);
-    struct net_bridge_port *br_port = hyfi_br_port_get(out);
-    struct hyfi_net_bridge_port *hyfi_p = hyfi_bridge_get_port(br_port);
+	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(out);
+	struct net_bridge_port *br_port = hyfi_br_port_get(out);
+	struct hyfi_net_bridge_port *hyfi_p = hyfi_bridge_get_port(br_port);
 
-    if (unlikely(!hyfi_br || !br_port || !hyfi_p)) {
-        return NF_ACCEPT;
-    }
+	if (unlikely(!hyfi_br || !br_port || !hyfi_p)) {
+		return NF_ACCEPT;
+	}
 
-    if (hyfi_brmode_relay_override(hyfi_br)) {
-        return NF_ACCEPT;
-    }
+	if (hyfi_brmode_relay_override(hyfi_br)) {
+		return NF_ACCEPT;
+	}
 
-	/* Should flood */
-	if (unlikely(is_multicast_ether_addr(eth_hdr(skb)->h_dest))) {
-		if (!hyfi_bridge_should_flood(hyfi_p, skb)) {
-			return NF_DROP;
-		}
-	} else {
-		if (!os_br_fdb_get(br_port->br, eth_hdr(skb)->h_dest)) {
+	if (likely(!hyfi_bridge_is_fwmode_mcast_only(hyfi_br))) {
+		/* Should flood */
+		if (unlikely(is_multicast_ether_addr(eth_hdr(skb)->h_dest))) {
 			if (!hyfi_bridge_should_flood(hyfi_p, skb)) {
-				/* Don't drop Homeplug control packets */
-				if(!(htons(eth_hdr(skb)->h_proto) == HOMEPLUG)) {
-					return NF_DROP;
+				return NF_DROP;
+			}
+		} else {
+			if (!os_br_fdb_get(br_port->br, eth_hdr(skb)->h_dest)) {
+				if (!hyfi_bridge_should_flood(hyfi_p, skb)) {
+					/* Don't drop Homeplug control packets */
+					if(!(htons(eth_hdr(skb)->h_proto) == HOMEPLUG)) {
+						return NF_DROP;
+					}
 				}
 			}
 		}
@@ -348,16 +352,18 @@ unsigned int hyfi_netfilter_pre_routing_hook(unsigned int hooknum,
 		if (hyfi_is_ieee1905_pkt(skb) || hyfi_is_lldp_pkt(skb)
 				|| hyfi_is_hcp_pkt(skb)) {
 			return NF_ACCEPT;
-		} else {
+		} else if (likely(!hyfi_bridge_is_fwmode_mcast_only(hyfi_br))) {
 			/* Drop broadcast and multicast packets on non-broadcast enabled ports */
 			return NF_DROP;
 		}
 	}
 
-	if ((dst = os_br_fdb_get(br_port->br, eth_hdr(skb)->h_source))) {
-		if (!hyfi_fdb_should_update(hyfi_br, br_port, dst->dst)) {
-			/* Drop packet, do not update fdb */
-			return NF_DROP;
+	if (likely(!hyfi_bridge_is_fwmode_mcast_only(hyfi_br))) {
+		if ((dst = os_br_fdb_get(br_port->br, eth_hdr(skb)->h_source))) {
+			if (!hyfi_fdb_should_update(hyfi_br, br_port, dst->dst)) {
+				/* Drop packet, do not update fdb */
+				return NF_DROP;
+			}
 		}
 	}
 

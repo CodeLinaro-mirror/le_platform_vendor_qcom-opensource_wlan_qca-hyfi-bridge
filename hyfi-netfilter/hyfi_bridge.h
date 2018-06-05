@@ -98,6 +98,37 @@ static inline bool hyfi_tcp_sp(const struct hyfi_net_bridge *hyfi_br)
 	return (hyfi_br->flags & HYFI_BRIDGE_FLAG_MODE_TCP_SP) ? true : false;
 }
 
+/**
+ * @brief Determine if the bridge is in Multicast Only forwarding mode.
+ *
+ * In this mode, only the IEEE1901/IEEE1905.1/LLDP/HCP multicast forwarding
+ * rules are applied.
+ *
+ * @param [in] hyfi_br  the bridge handle
+ *
+ * @return true if it is in APS forwarding mode; otherwise false
+ */
+static inline bool hyfi_bridge_is_fwmode_aps(
+		const struct hyfi_net_bridge *hyfi_br)
+{
+	return (hyfi_br->flags & HYFI_BRIDGE_FLAG_FWMODE_MASK) == 0 ?
+			true : false;
+}
+
+/**
+ * @brief Determine if the bridge is in APS forwarding mode.
+ *
+ * @param [in] hyfi_br  the bridge handle
+ *
+ * @return true if it is in APS forwarding mode; otherwise false
+ */
+static inline bool hyfi_bridge_is_fwmode_mcast_only(
+		const struct hyfi_net_bridge *hyfi_br)
+{
+	return (hyfi_br->flags & HYFI_BRIDGE_FLAG_FWMODE_MCAST_ONLY) ?
+			true : false;
+}
+
 static inline bool hyfi_portgrp_relay(const struct hyfi_net_bridge_port *p)
 {
 	return (!p || (p && p->group_type == HYFI_PORTGRP_TYPE_RELAY)) ?

@@ -35,6 +35,8 @@
  * HYFI_GET_PORT_LIST:         multiple of struct __brport_group
  * HYFI_SET_EVENT_INFO:        struct __event_info
  * HYFI_SET_BRIDGE_MODE:       bridge mode (HR or HC) (u32)
+ * HYFI_SET_BRIDGE_FWMODE:     bridge forwarding mode (APS, Single backhaul, or
+ *                                                     Multicast only) (u32)
  * HYFI_SET_BRPORT_GROUP:      group num and type (u32)
  * HYFI_FLUSH_HATBL:
  * HYFI_ADD_HATBL_ENTRIES:     multiple of struct __hatbl_entry
@@ -87,6 +89,7 @@ enum {
 	HYFI_ATTACH_BRIDGE,
 	HYFI_DETACH_BRIDGE,
 	HYFI_GET_SWITCH_PORT_ID,
+	HYFI_SET_BRIDGE_FWMODE,  /* special forwarding mode rules */
 
 	HYFI_GET_PORT_LIST = 0x100,
 	HYFI_SET_BRPORT_GROUP, /* port group number and type */
@@ -126,6 +129,23 @@ enum {
  */
 #define HYFI_BRIDGE_MODE_RELAY_OVERRIDE        (1)
 
+/**
+ * Forwarding mode:
+ * The Hybrid bridge can be programmed in one of three modes:
+ * 1. Full Hy-Fi forwarding rules: Use H-Default, H-Active, and bridge port
+ *                                 configurations to determine whether a
+ *                                 packet is dropped and the egress port
+ *                                 (on output/forward).
+ * 2. No hybrid tables: Use purely the FDB for egress port selection.
+ *                      Still enforce the other rules for forwarding/local
+ *                      input that are based on bridge port configuration.
+ * 3. Multicast only: Only apply the rules relating to IEEE1901/IEEE1905.1/
+ *                    LLDP/HCP packets (and specifically multicast).
+ */
+#define HYFI_BRIDGE_FWMODE_APS                (0)
+#define HYFI_BRIDGE_FWMODE_NO_HYBRID_TABLES   (1)
+#define HYFI_BRIDGE_FWMODE_MCAST_ONLY         (2)
+
 /* Group type:
  * A port can belong to either 2 groups:
  * 1. Relay group: Where packets are relayed from each port to every other port
@@ -138,6 +158,27 @@ enum {
 
 #define HYFI_BRIDGE_FLAG_MODE_RELAY_OVERRIDE    ( 1<<0 )
 #define HYFI_BRIDGE_FLAG_MODE_TCP_SP            ( 1<<1 )
+
+/**
+ * H-Default and H-Active tables are not used for forwarding decisions.
+ */
+#define HYFI_BRIDGE_FLAG_FWMODE_NO_HYBRID_TABLES  ( 1<<2 )
+
+/**
+ * Only the IEEE1901/IEEE1905.1/LLDP/HCP multicast forwarding rules are
+ * enforced.
+ *
+ * No other rules are enforced (including any rules relating to the
+ * different types of ports).
+ */
+#define HYFI_BRIDGE_FLAG_FWMODE_MCAST_ONLY        ( 1<<3 )
+
+/**
+ * The mask to extract the bits of the flags that determine which bridge
+ * forwarding rules are applied.
+ */
+#define HYFI_BRIDGE_FLAG_FWMODE_MASK ( HYFI_BRIDGE_FLAG_FWMODE_NO_HYBRID_TABLES |  \
+                                       HYFI_BRIDGE_FLAG_FWMODE_MCAST_ONLY )
 
 /* The hyInterfaceType enum is deprecated and should not be used anymore.
  * It is kept here temporarily until it will be cleaned completely.

@@ -600,6 +600,10 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 	if (unlikely(!br || !hyfi_br || !hyfi_br->dev || br->dev != hyfi_br->dev))
 		return NULL;
 
+	/* If not operating in APS mode, no hybrid tables are consulted. */
+	if (unlikely(!hyfi_bridge_is_fwmode_aps(hyfi_br)))
+		return NULL;
+
 	if (unlikely(hyfi_hash_skbuf(*skb, &hash, &flag, &priority, &seq)))
 		return NULL;
 
@@ -703,6 +707,10 @@ struct net_bridge_port *hyfi_bridge_port_dev_get(struct net_device *dev,
 		return NULL;
 
 	if (unlikely(!br || !hyfi_br->dev || dev != hyfi_br->dev))
+		return NULL;
+
+	/* If not operating in APS mode, no hybrid tables are consulted. */
+	if (unlikely(!hyfi_bridge_is_fwmode_aps(hyfi_br)))
 		return NULL;
 
 	if (unlikely(hyfi_hash_skbuf(skb, &hash, &flag, &priority, &seq)))
