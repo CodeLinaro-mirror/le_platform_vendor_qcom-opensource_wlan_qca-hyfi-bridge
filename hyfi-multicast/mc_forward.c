@@ -175,7 +175,7 @@ static void mc_flood_hook(__be32 ifindex, struct sk_buff *skb, int forward)
     if (!br_port)
         goto out;
 
-	hyfi_hatbl_update_mcast_stats(br_port->br, skb, br_port);
+    hyfi_hatbl_update_mcast_stats(br_port->br, skb, br_port);
 
     if (forward) {
         hyfi_br_forward(br_port, skb);
