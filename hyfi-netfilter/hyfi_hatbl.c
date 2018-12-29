@@ -170,7 +170,7 @@ static void hatbl_fillbuf(struct net_hatbl_entry *ha, struct __hatbl_entry *hae)
 		hae->aggr_entry = 0;
 	}
 
-	hae->age = hyfi_hatbl_calculate_elapsed_time(jiffies, ha->last_access);
+	hae->age = (u_int32_t)hyfi_hatbl_calculate_elapsed_time(jiffies, ha->last_access);
 	hae->age = jiffies_to_msecs(hae->age) / 1000; /* sec */
 	hae->num_packets = ha->num_packets;
 	hae->num_bytes = ha->num_bytes;
@@ -852,14 +852,14 @@ void hyfi_hatbl_fini(struct hyfi_net_bridge *br)
 	kmem_cache_destroy(hyfi_hatbl_cache);
 }
 
-u_int32_t hyfi_hatbl_calculate_elapsed_time(u_int32_t time_now,
-	u_int32_t time_previous)
+unsigned long hyfi_hatbl_calculate_elapsed_time(unsigned long time_now,
+	unsigned long time_previous)
 {
 	if (time_now >= time_previous) {
 		/* Non-rollover case */
 		return time_now - time_previous;
 	} else {
 		/* Rollover case */
-		return UINT_MAX - (time_previous - time_now) + 1;
+		return ULONG_MAX - (time_previous - time_now) + 1;
 	}
 }

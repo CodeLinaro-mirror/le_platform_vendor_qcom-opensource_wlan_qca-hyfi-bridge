@@ -53,8 +53,8 @@ struct net_hatbl_entry {
 	mac_addr sa;
 	mac_addr da;
 	mac_addr id;
-	u_int32_t last_access;
-	u_int32_t create_time;
+	unsigned long last_access;
+	unsigned long create_time;
 	u_int32_t num_packets;
 	u_int32_t num_bytes;
 	u_int64_t prev_num_packets;
@@ -207,7 +207,7 @@ void hyfi_hatbl_mark_decelerated(struct net_hatbl_entry *ha);
  *
  * @return difference between previous time and current time
  */
-u_int32_t hyfi_hatbl_calculate_elapsed_time(u_int32_t time_now,
-	u_int32_t time_previous);
+unsigned long hyfi_hatbl_calculate_elapsed_time(unsigned long time_now,
+	unsigned long time_previous);
 
 #endif
