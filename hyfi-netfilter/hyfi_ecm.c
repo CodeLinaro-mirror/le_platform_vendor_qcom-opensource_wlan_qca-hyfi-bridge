@@ -91,6 +91,9 @@ static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br,
 	traffic_class = (flow->flag & ECM_HYFI_IS_IPPROTO_UDP) ?
 			HYFI_TRAFFIC_CLASS_UDP : HYFI_TRAFFIC_CLASS_OTHER;
 
+	if (unlikely(!hyfi_bridge_is_fwmode_aps(hyfi_br)))
+		return 0;
+
 	spin_lock_bh(&hyfi_br->hash_ha_lock);
 
 	/* Find H-Active entry */

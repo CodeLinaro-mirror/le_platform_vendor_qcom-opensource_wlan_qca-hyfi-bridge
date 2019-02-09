@@ -760,6 +760,9 @@ void hyfi_hatbl_update_mcast_stats(struct net_bridge *br, struct sk_buff *skb,
 	if(!hyfi_br)
 		return;
 
+	if (unlikely(!hyfi_bridge_is_fwmode_aps(hyfi_br)))
+		return;
+
 	if (hyfi_hash_skbuf(skb, &hash, &flag, &priority, &unused)) {
 		return;
 	}

@@ -86,9 +86,20 @@ static void mc_encap_hook(struct net_bridge *br,
         struct sk_buff *skb, int forward)
 {
     struct net_bridge_port *pdst = NULL;
+    struct net_bridge_fdb_entry *dst;
+
+    if (!skb)
+        goto out;
+
     memcpy(eth_hdr(skb)->h_dest, encap_dev->mac, ETH_ALEN);
 
     pdst = hyfi_bridge_get_dst(hyfi_br_port_get(skb->dev), &skb);
+
+    if (pdst == NULL){
+        if ((dst = os_br_fdb_get((struct net_bridge *)br, eth_hdr(skb)->h_dest)) && !dst->is_local) {
+            pdst = dst->dst;
+        }
+    }
 
     if (pdst) {
         if (!skb || pdst == (struct net_bridge_port *)-1)
