@@ -327,7 +327,7 @@ unsigned int hyfi_netfilter_pre_routing_hook(unsigned int hooknum,
 	if (!br_dev)
 		return NF_ACCEPT;
 
-#ifndef PLC_NF_ENABLE
+#ifdef PLC_NF_ENABLE
 	if (unlikely(hyfi_is_ieee1901_pkt(skb))) {
 		struct sk_buff *skb2 = skb_clone(skb, GFP_ATOMIC);
 
