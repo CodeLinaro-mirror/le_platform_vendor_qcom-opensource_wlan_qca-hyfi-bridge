@@ -603,11 +603,10 @@ int hyfi_hatbl_update_local(struct hyfi_net_bridge *br, u_int32_t hash,
 			ha->local = 0;
 		} else {
 			/* fastpath: update of existing entry */
-			if (ha->local) {
-				ha->dst = dst;
-				ha->sub_class = sub_class;
-				ha->priority = priority;
-			}
+			ha->dst = dst;
+			ha->sub_class = sub_class;
+			ha->priority = priority;
+			ha->local = 1;
 		}
 
 		return 0;

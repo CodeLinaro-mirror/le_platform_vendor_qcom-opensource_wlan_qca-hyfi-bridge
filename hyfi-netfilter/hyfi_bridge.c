@@ -617,6 +617,12 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 	if (src && (flag & IS_IPPROTO_TCP) && hyfi_tcp_sp(hyfi_br) &&
 			!hyfi_portgrp_relay(hyfi_bridge_get_port(src)) &&
 			(hd = __hyfi_hdtbl_get(hyfi_br, eth_hdr(*skb)->h_source))) {
+				/* Calculate reverse Hash for the Data so that its corresponding
+				 * TCP ACK will have this same hash value
+				 */
+				if (unlikely(hyfi_hash_skbuf_reverse(*skb, &hash))) {
+					return NULL;
+				}
 				hyfi_hatbl_update_local(hyfi_br, hash,eth_hdr(*skb)->h_source,
 						eth_hdr(*skb)->h_dest, hd, (struct net_bridge_port *)src,
 						HYFI_TRAFFIC_CLASS_OTHER, priority, flag);
