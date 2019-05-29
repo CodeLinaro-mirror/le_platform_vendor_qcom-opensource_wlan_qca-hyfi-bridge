@@ -51,8 +51,12 @@ struct hyfi_net_bridge {
 
 	struct path_switch_param path_switch_param;
 	void *mc;
-        unsigned char multicast_router;
+	unsigned char multicast_router;
+
+	// The list of bridge ports along with a counter that tracks how many
+	// are non-relaying (for use in the FDB update rules).
 	struct list_head port_list;
+	atomic_t num_port_non_relay;
 
 	struct net_device *dev;
 	char linux_bridge[IFNAMSIZ]; /* Linux bridge name */
@@ -99,10 +103,7 @@ static inline bool hyfi_tcp_sp(const struct hyfi_net_bridge *hyfi_br)
 }
 
 /**
- * @brief Determine if the bridge is in Multicast Only forwarding mode.
- *
- * In this mode, only the IEEE1901/IEEE1905.1/LLDP/HCP multicast forwarding
- * rules are applied.
+ * @brief Determine if the bridge is in APS forwarding mode.
  *
  * @param [in] hyfi_br  the bridge handle
  *
@@ -116,7 +117,10 @@ static inline bool hyfi_bridge_is_fwmode_aps(
 }
 
 /**
- * @brief Determine if the bridge is in APS forwarding mode.
+ * @brief Determine if the bridge is in Multicast Only forwarding mode.
+ *
+ * In this mode, only the IEEE1901/IEEE1905.1/LLDP/HCP multicast forwarding
+ * rules are applied.
  *
  * @param [in] hyfi_br  the bridge handle
  *

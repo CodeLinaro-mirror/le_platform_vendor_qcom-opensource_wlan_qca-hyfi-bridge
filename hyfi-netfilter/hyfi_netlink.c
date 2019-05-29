@@ -413,8 +413,23 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 					if ((bp = br_port)) {
 						struct hyfi_net_bridge_port *hyfi_p = hyfi_bridge_get_port(bp);
 						if (hyfi_p) {
+							bool changed = false;
+							if (hyfi_p->group_type != p->group_type) {
+								changed = true;
+							}
+
 							hyfi_p->group_num = p->group_num;
 							hyfi_p->group_type = p->group_type;
+
+							// Perform the counter update after the actual type
+							// change has taken place.
+							if (changed) {
+								if (p->group_type == HYFI_PORTGRP_TYPE_RELAY) {
+									atomic_dec(&br->num_port_non_relay);
+								} else {
+									atomic_inc(&br->num_port_non_relay);
+								}
+							}
 						} else {
 							hymsghdr->status = HYFI_STATUS_FAILURE;
 						}
