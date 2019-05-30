@@ -95,6 +95,9 @@ static void mc_encap_hook(struct net_bridge *br,
 
     pdst = hyfi_bridge_get_dst(hyfi_br_port_get(skb->dev), &skb);
 
+    if (!skb)
+        goto out;
+
     if (pdst == NULL){
         if ((dst = os_br_fdb_get((struct net_bridge *)br, eth_hdr(skb)->h_dest)) && !dst->is_local) {
             pdst = dst->dst;
