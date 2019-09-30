@@ -359,13 +359,7 @@ unsigned int hyfi_netfilter_pre_routing_hook(unsigned int hooknum,
 	}
 
 	if (likely(!hyfi_bridge_is_fwmode_mcast_only(hyfi_br))) {
-		/* Only enforce FDB update rule if there is more than one
-		 * non-relaying port. With only one non-relaying port, there
-		 * is no chance of a looped back packet resulting in
-		 * unnecessary FDB updates.
-		 */
-		if (atomic_read(&hyfi_br->num_port_non_relay) > 1 &&
-		    (dst = os_br_fdb_get(br_port->br, eth_hdr(skb)->h_source))) {
+		if ((dst = os_br_fdb_get(br_port->br, eth_hdr(skb)->h_source))) {
 			if (!hyfi_fdb_should_update(hyfi_br, br_port, dst->dst)) {
 				/* Drop packet, do not update fdb */
 				return NF_DROP;

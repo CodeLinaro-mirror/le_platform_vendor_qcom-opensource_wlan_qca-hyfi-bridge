@@ -242,8 +242,6 @@ int hyfi_bridge_init_port(struct hyfi_net_bridge *hyfi_br, struct net_bridge_por
 	hyfi_p->port_type = HYFI_PORT_INVALID_TYPE;
 	hyfi_p->dev = p->dev;
 
-	atomic_inc(&hyfi_br->num_port_non_relay);
-
 	list_add_rcu(&hyfi_p->list, &hyfi_br->port_list);
 	DEBUG_INFO("hyfi: Added interface %s\n", p->dev->name);
 
@@ -268,10 +266,6 @@ int hyfi_bridge_delete_port(struct hyfi_net_bridge *hyfi_br, struct net_bridge_p
 
 	list_for_each_entry_rcu(hyfi_p, &hyfi_br->port_list, list) {
 		if (hyfi_p->dev == p->dev) {
-			if (hyfi_p->group_type != HYFI_PORTGRP_TYPE_RELAY) {
-				atomic_dec(&hyfi_br->num_port_non_relay);
-			}
-
 			list_del_rcu(&hyfi_p->list);
 			call_rcu(&hyfi_p->rcu, hyfi_destroy_port_rcu);
 			return 0;
@@ -849,8 +843,6 @@ static int hyfi_bridge_deinit_bridge_device(struct hyfi_net_bridge *hf_br)
 
 	hyfi_bridge_del_ports(hf_br);
 
-	atomic_set(&hf_br->num_port_non_relay, 0);
-
 	hyfi_hatbl_flush(hf_br);
 	hyfi_hdtbl_flush(hf_br);
 
@@ -939,8 +931,6 @@ int __init hyfi_bridge_init(void)
 
 		/* Init seamless path switching */
 		hyfi_psw_init(&hyfi_bridges[i]);
-
-		atomic_set(&hyfi_bridges[i].num_port_non_relay, 0);
 	}
 
 	return 0;
