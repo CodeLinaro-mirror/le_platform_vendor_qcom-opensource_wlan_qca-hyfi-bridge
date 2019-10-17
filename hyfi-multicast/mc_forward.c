@@ -182,12 +182,16 @@ static void mc_flood_hook(__be32 ifindex, struct sk_buff *skb, int forward)
     struct net_device *dev;
     struct net_bridge_port *br_port;
  
-    if (!(dev = dev_get_by_index(&init_net, ifindex))) 
+    if (!(dev = dev_get_by_index(&init_net, ifindex))) {
+        kfree_skb(skb);
         return;
+    }
 
     br_port = hyfi_br_port_get(dev);
-    if (!br_port)
+    if (!br_port) {
+        kfree_skb(skb);
         goto out;
+    }
 
     hyfi_hatbl_update_mcast_stats(br_port->br, skb, br_port);
 
@@ -284,6 +288,8 @@ static int mc_do_flood(struct mc_mdb_entry *mdb, struct sk_buff *skb, int forwar
     }
     if (prev) 
         mc_flood_hook(prev, skb, forward);
+    else
+        kfree_skb(skb);
     read_unlock(&mdb->rwlock);
 
     return 0;
