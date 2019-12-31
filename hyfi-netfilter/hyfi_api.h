@@ -90,6 +90,7 @@ enum {
 	HYFI_DETACH_BRIDGE,
 	HYFI_GET_SWITCH_PORT_ID,
 	HYFI_SET_BRIDGE_FWMODE,  /* special forwarding mode rules */
+	HYFI_SET_BRIDGE_TS_MODE,  /* traffic separation enabled */
 
 	HYFI_GET_PORT_LIST = 0x100,
 	HYFI_SET_BRPORT_GROUP, /* port group number and type */

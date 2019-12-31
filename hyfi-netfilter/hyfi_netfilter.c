@@ -154,6 +154,12 @@ unsigned int hyfi_netfilter_forwarding_hook(unsigned int hooknum,
 	if (unlikely(!hyfi_br || !br_port))
 		return NF_ACCEPT;
 
+	if (unlikely(hyfi_br->TSEnabled)) {
+		if (unlikely(skb->vlan_tci != 0)) {
+			return NF_DROP;
+		}
+	}
+
 	if (unlikely( (hyfi_is_ieee1905_pkt(skb)
 					&& (!compare_ether_addr(eth_hdr(skb)->h_dest,
 							IEEE1905_MULTICAST_ADDR)
@@ -273,6 +279,12 @@ unsigned int hyfi_netfilter_local_in_hook(unsigned int hooknum,
 
 	if (unlikely(!hyfi_br))
 		return NF_ACCEPT;
+
+	if (unlikely(hyfi_br->TSEnabled)) {
+		if (unlikely(skb->vlan_tci != 0)) {
+			return NF_DROP;
+		}
+	}
 
 	br_dev = hyfi_br->dev;
 	if (unlikely(!br_dev))

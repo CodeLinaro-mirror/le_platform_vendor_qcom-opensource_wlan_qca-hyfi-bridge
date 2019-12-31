@@ -524,6 +524,17 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 			}
 				break;
 
+			case HYFI_SET_BRIDGE_TS_MODE: {
+				u32 *p = hymsgdata;
+				spin_lock_bh(&br->lock);
+				if (*p == 1)
+					br->TSEnabled = 1;
+				else
+					br->TSEnabled = 0;
+				spin_unlock_bh( &br->lock);
+				break;
+			}
+
 			default:
 				DEBUG_WARN("hyfi: Unknown message type 0x%x\n", msgtype);
 				hymsghdr->status = HYFI_STATUS_INVALID_PARAMETER;
