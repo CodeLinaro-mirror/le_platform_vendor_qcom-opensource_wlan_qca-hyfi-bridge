@@ -195,6 +195,7 @@ enum {
 enum __HY_MISUSE_PROTECT( hyInterfaceType ) {
 	__HY_MISUSE_PROTECT( hyInterface_WIFI_2G ) = 0, /* Always leave W2G as '0': used as index by pcw service */
 	__HY_MISUSE_PROTECT( hyInterface_WIFI_5G ),
+	__HY_MISUSE_PROTECT( hyInterface_WIFI_6G ),
 	__HY_MISUSE_PROTECT( hyInterface_HPAV ),
 	__HY_MISUSE_PROTECT( hyInterface_ETH ),
 
