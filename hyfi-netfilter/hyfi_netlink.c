@@ -534,7 +534,9 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				spin_unlock_bh( &br->lock);
 				break;
 			}
-
+			case HYFI_SET_SP_RULE:{
+				break;
+			}
 			default:
 				DEBUG_WARN("hyfi: Unknown message type 0x%x\n", msgtype);
 				hymsghdr->status = HYFI_STATUS_INVALID_PARAMETER;

@@ -120,7 +120,9 @@ enum {
 	HYFI_SET_PSW_DROP_MARKERS,
 	HYFI_SET_PSW_OLD_IF_QUIET_TIME,
 	HYFI_SET_PSW_DUP_PKT_FLUSH_QUOTA,
-	HYFI_PSW_LAST
+	HYFI_PSW_LAST,
+
+	HYFI_SET_SP_RULE = 0x700, /* Service priortization rule */
 };
 
 /* Bridge mode:
@@ -326,6 +328,46 @@ struct __hatbl_entry {
 
 struct __path_switch_param {
 	u_int32_t enable_switch_markers;
+};
+struct __sp_rule {
+	/// service prioritization rule identifier.
+	u_int32_t id;
+	/// add-remove filter rule bit.
+	/// 1 means add 0 means delete
+	u_int8_t add_delete_rule ;
+	/// rule precedence – higher number means higher priority.
+	u_int8_t rule_precedence;
+	/// rule output the value of or method  used to select the 802.1q c-tag
+	/// pcp value with which  to mark the matched packet.
+	u_int8_t rule_output;
+	/// rule match always true
+	/// s(skip field matching) flag
+	u_int8_t rule_match_always_true ;
+	/// match up in 802.11 qos control flag
+	u_int8_t matchup ;
+	/// up in 802.11 qos control match sense flag
+	u_int8_t match_up_sense ;
+	/// match source mac address flag
+	u_int8_t match_source_mac ;
+	/// match source mac address sense
+	u_int8_t match_source_mac_sense ;
+	/// match destination mac address flags
+	u_int8_t match_dst_mac ;
+	/// destination mac address match sense flag
+	u_int8_t match_dst_mac_sense ;
+	/// up in 802.11 qos control
+	u_int8_t user_priority;
+	/// source mac address
+	/// if “match source mac address” flag bit is set to one,
+	/// this field shall be included, otherwise this field shall be omitted.
+	u_int8_t sa[6];
+	/// destination mac address
+	/// if “match destination mac address” flag bit is set to one,
+	/// this field shall be included, otherwise this field shall be omitted.
+	u_int8_t da[6];
+
+	/// internal field to keep track if rule is valid or not
+	u_int8_t valid;
 };
 
 #endif
