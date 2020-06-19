@@ -45,6 +45,10 @@ ifeq ($(strip ${PLC_SUPPORT_NETFILTER}),1)
 ccflags-y+=-DPLC_NF_ENABLE
 endif
 
+ifeq ($(strip ${DISABLE_SSDK_SUPPORT}),1)
+ccflags-y+=-DHYFI_DISABLE_SSDK_SUPPORT
+endif
+
 # #############################################################################
 # Debug flags, set these to = 0 if you want to disable all debugging.
 # By turning off debugs you gain maximum performance.
