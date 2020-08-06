@@ -191,6 +191,17 @@ int hyfi_bridge_dev_event(struct hyfi_net_bridge *hyfi_br,
 	case NETDEV_CHANGE:
 	    break;
 
+	case NETDEV_UNREGISTER:
+		if (!hyfi_br->dev)
+			break;
+		if ((dev->name) && !strcmp(dev->name, hyfi_br->linux_bridge)) {
+			if (dev->priv_flags & IFF_EBRIDGE) {
+				hyfi_bridge_deinit_bridge_device(hyfi_br);
+				sync_and_free = 1;
+			}
+		}
+		break;
+
 	default:
 		break;
 	}
