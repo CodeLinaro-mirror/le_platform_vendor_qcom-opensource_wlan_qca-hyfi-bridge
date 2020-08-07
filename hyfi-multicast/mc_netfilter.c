@@ -133,7 +133,7 @@ HYFI_MC_STATIC unsigned int mc_forward_hook(unsigned int hooknum, struct sk_buff
     struct mc_struct *mc = MC_DEV(hyfi_br);
     struct hlist_head *rhead = NULL;
     struct net_bridge_port *port;
-    struct mc_mdb_entry *mdb = MC_SKB_CB(skb)->mdb;
+    struct mc_mdb_entry *mdb = NULL;
 
     rcu_read_lock();
 
@@ -142,6 +142,16 @@ HYFI_MC_STATIC unsigned int mc_forward_hook(unsigned int hooknum, struct sk_buff
         (unlikely(is_broadcast_ether_addr(eth_hdr(skb)->h_dest)))) {
         goto accept;
     }
+
+    if ((port = hyfi_br_port_get(in)) == NULL || !mc ){
+        goto accept;
+    }
+
+    if (!MC_SKB_CB(skb)->igmp) {
+        goto accept;
+    }
+
+    mdb = MC_SKB_CB(skb)->mdb;
 
     /* Leave filter */
     if (mdb && MC_SKB_CB(skb)->type == MC_LEAVE && 
@@ -152,10 +162,7 @@ HYFI_MC_STATIC unsigned int mc_forward_hook(unsigned int hooknum, struct sk_buff
             MC_SKB_CB(skb)->type != MC_REPORT)
         goto accept;
 
-    if ((port = hyfi_br_port_get(in)) == NULL)
-        goto accept;
-
-    if (!mc || !mc->started)
+    if (!mc->started)
         goto accept;
 
     /* Report/Leave forward */
