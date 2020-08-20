@@ -495,6 +495,11 @@ static void mc_mdb_destroy(struct mc_mdb_entry *mdb)
     hlist_del_rcu(&mdb->hlist);
     del_timer_sync(&mdb->etimer);
 
+    if (mdb->flood_ifcnt != 0) {
+        mc_group_notify_one(mdb->mc, &mdb->group);
+        mdb->flood_ifcnt = 0;
+    }
+
     call_rcu(&mdb->rcu, mc_mdb_rcu_free);
 }
 
