@@ -679,55 +679,67 @@ static struct mc_fdb_group *mc_update_mdb(struct mc_struct *mc,
     unsigned long now = jiffies;
     struct mc_mdb_entry *mdb;
     struct mc_port_group *pg;
-    struct mc_fdb_group *fg;
+    struct mc_fdb_group *fg = NULL;
     struct hlist_head *head = 
         &mc->hash[mc_group_hash(mc->salt, group->u.ip4)];
 
-    mdb = mc_mdb_find(head, group);
-    if (!mdb) {
-        spin_lock_bh(&mc->lock);
-        mdb = mc_mdb_find(head, group);
-        if (!mdb) {
-            mdb = mc_mdb_create(mc, head, group);
-        }
-        spin_unlock_bh(&mc->lock);
-        if (!mdb) 
-            return NULL;
+    if (!mc->started) {
+        return NULL;
     }
-    MC_SKB_CB(skb)->mdb = mdb;
 
-    if ((fg = mc_update_hybrid_fdb_group(mc, &mdb->pslist, fdb->addr.addr, now, port)))
-        return fg;
+    spin_lock_bh(&mc->lock);
+    mdb = mc_mdb_find(head, group);
+    if (mdb != NULL) {
+        if ((fg = mc_update_hybrid_fdb_group(mc, &mdb->pslist, fdb->addr.addr, now, port))) {
+            goto success;
+        }
+    } else {
+        if (mc->active_group_count < MC_GROUP_MAX) {
+            mdb = mc_mdb_create(mc, head, group);
+        } else {
+            MC_PRINT("%s: Snooping table is full!!\n", __func__);
+        }
+        if (mdb == NULL) {
+            goto failure;
+        }
+    }
 
     pg = mc_port_group_find(&mdb->pslist, port);
-    if (!pg) {
-        spin_lock_bh(&mc->lock);
-        pg = mc_port_group_find(&mdb->pslist, port);
-        if (!pg) {
-            pg = mc_port_group_create(mdb, port);
+    if (pg == NULL) {
+        pg = mc_port_group_create(mdb, port);
+        if (pg == NULL) {
+            goto failure;
         }
-        spin_unlock_bh(&mc->lock);
-        if (!pg)
-            return NULL;
     }
 
     fg = mc_fdb_group_find(&pg->fslist, fdb->addr.addr);
-    if (!fg) {
-        spin_lock_bh(&mc->lock);
-        fg = mc_fdb_group_find(&pg->fslist, fdb->addr.addr);
-        if (!fg) {
-            fg = mc_fdb_group_create(pg, fdb->addr.addr);
+    if (fg == NULL) {
+        /*Before creating new fdb group, check if it will reach at MAX group*/
+        if (atomic_read(&mdb->users) == 0
+                && mc->active_group_count >= MC_GROUP_MAX) {
+            MC_PRINT("%s: Snooping table is full!!\n", __func__);
+            goto failure;
         }
-        spin_unlock_bh(&mc->lock);
-        if (!fg)
-            return NULL;
+        fg = mc_fdb_group_create(pg, fdb->addr.addr);
+        if (fg != NULL) {
+            if (atomic_inc_return(&mdb->users) == 1)
+                mc->active_group_count++;
+        } else {
+            MC_PRINT("%s: No memory\n", __func__);
+            goto failure;
+        }
     }
 
     /* Update all ageing timers */
     pg->ageing_timer = now;
     fg->ageing_timer = now;
-    fg->fdb_age_out = 0;
 
+success:
+    fg->fdb_age_out = 0;
+    MC_SKB_CB(skb)->mdb = mdb;
+
+failure:
+    spin_unlock_bh(&mc->lock);
     return fg;
 }
 
