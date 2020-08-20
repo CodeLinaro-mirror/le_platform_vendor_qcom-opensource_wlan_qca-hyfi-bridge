@@ -53,7 +53,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 	struct net_bridge_port *br_port = NULL;
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0))
-        if ((skb = skb_clone(__skb, GFP_KERNEL)) != NULL)
+        if ((skb = skb_clone(__skb, GFP_ATOMIC)) != NULL)
 #else
 	if ((skb = skb_get(__skb)) != NULL )
 #endif

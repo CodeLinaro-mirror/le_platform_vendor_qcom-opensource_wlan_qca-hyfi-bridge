@@ -103,9 +103,7 @@ static inline struct net_bridge_port *hyfi_br_port_get(const struct net_device *
 	if (!dev)
 		return NULL;
 
-	rcu_read_lock();
 	br_port = rcu_dereference(dev->br_port);
-	rcu_read_unlock();
 
 	return br_port;
 }
