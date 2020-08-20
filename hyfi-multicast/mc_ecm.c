@@ -128,10 +128,11 @@ static int __hyfi_bridge_mc_get_ifs(struct net_device *brdev, struct mc_ip *mc_g
             if (mc_group->pro == htons(ETH_P_IP))
                 MC_PRINT("Group "MC_IP4_STR" Source "MC_IP4_STR"  ignored for port %d\n",
                     MC_IP4_FMT((u8 *)&mc_group->u.ip4), MC_IP4_FMT((u8 *)&mc_source->u.ip4), mdb->flood_ifindex[i]);
+#ifdef HYBRID_MC_MLD
             else
                 MC_PRINT("Group "MC_IP6_STR" Source "MC_IP6_STR"  ignored for port %d\n",
                     MC_IP6_FMT((__be16 *)&mc_group->u.ip6), MC_IP6_FMT((__be16 *)&mc_source->u.ip6), mdb->flood_ifindex[i]);
-
+#endif
             continue;
         }
 

@@ -42,6 +42,9 @@ static void mc_retag(void *iph, __be16 etype, __be32 dscp)
 
 static int mc_encap_check_source(int pro, void *srcs, int offset, void *iph)
 {
+    if(offset > HYFI_MC_IP6_SIZE)
+        return -1;
+
     if (pro == htons(ETH_P_IP)) {
         return (*((__be32 *)srcs + offset) == ((struct iphdr *)iph)->saddr);
     }
@@ -430,7 +433,7 @@ out:
     return -EINVAL;
 }
 
-static int mc_process(const struct net_bridge_port *src, struct sk_buff *skb)
+static int __mc_process(const struct net_bridge_port *src, struct sk_buff *skb)
 {
 	struct net_bridge *br;
     struct hyfi_net_bridge *hyfi_br;
@@ -465,6 +468,22 @@ static int mc_process(const struct net_bridge_port *src, struct sk_buff *skb)
     
     return mc_convert(mc, skb, 1);
 }
+
+/*
+ * mc_process
+ * callback of br_multicast_handle_hook from the linux kernel
+ */
+static int mc_process(const struct net_bridge_port *src, struct sk_buff *skb)
+{
+    int  ret;
+
+    rcu_read_lock();
+    ret = __mc_process(src, skb);
+    rcu_read_unlock();
+
+    return ret;
+}
+
 
 int mc_forward_init(void)
 {

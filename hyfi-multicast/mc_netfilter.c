@@ -64,6 +64,8 @@ HYFI_MC_STATIC unsigned int mc_pre_routing_hook(unsigned int hooknum, struct sk_
     struct net_bridge_port *port;
     u8 dscp;
 
+    rcu_read_lock();
+
     if (!mc || skb->pkt_type != PACKET_HOST ||
             (port = hyfi_br_port_get(in)) == NULL)
         goto out;
@@ -75,7 +77,7 @@ HYFI_MC_STATIC unsigned int mc_pre_routing_hook(unsigned int hooknum, struct sk_
             {
                 const struct iphdr *iph = ip_hdr(skb);
                 if (ipv4_is_multicast(iph->daddr) && (!mc->enable_retag || 
-                            (mc->enable_retag && (ipv4_get_dsfield(iph) == dscp)))) {
+                            (ipv4_get_dsfield(iph) == dscp))) {
                     ip_eth_mc_map(iph->daddr, eh->h_dest);
 
                     if (mc->debug && printk_ratelimit()) {
@@ -91,7 +93,7 @@ HYFI_MC_STATIC unsigned int mc_pre_routing_hook(unsigned int hooknum, struct sk_
             {
                 struct ipv6hdr *iph6 = ipv6_hdr(skb);
                 if (ipv6_addr_is_multicast(&iph6->daddr) && (!mc->enable_retag || 
-                            (mc->enable_retag && (ipv6_get_dsfield(iph6) == dscp)))) {
+                            (ipv6_get_dsfield(iph6) == dscp))) {
                     ipv6_eth_mc_map(&iph6->daddr, eh->h_dest);
 
                     if (mc->debug && printk_ratelimit()) {
@@ -105,6 +107,7 @@ HYFI_MC_STATIC unsigned int mc_pre_routing_hook(unsigned int hooknum, struct sk_
 #endif
     }
 out:
+    rcu_read_unlock();
     return NF_ACCEPT;
 }
 
@@ -132,6 +135,8 @@ HYFI_MC_STATIC unsigned int mc_forward_hook(unsigned int hooknum, struct sk_buff
     struct net_bridge_port *port;
     struct mc_mdb_entry *mdb = MC_SKB_CB(skb)->mdb;
 
+    rcu_read_lock();
+
     /* Checks are relevant for multicast packets only */
     if ((likely(!is_multicast_ether_addr(eth_hdr(skb)->h_dest))) ||
         (unlikely(is_broadcast_ether_addr(eth_hdr(skb)->h_dest)))) {
@@ -147,9 +152,12 @@ HYFI_MC_STATIC unsigned int mc_forward_hook(unsigned int hooknum, struct sk_buff
             MC_SKB_CB(skb)->type != MC_REPORT)
         goto accept;
 
-    if ((port = hyfi_br_port_get(in)) == NULL || !mc )
+    if ((port = hyfi_br_port_get(in)) == NULL)
         goto accept;
-    
+
+    if (!mc || !mc->started)
+        goto accept;
+
     /* Report/Leave forward */
     if (mc->rp.type == MC_RTPORT_DEFAULT) {
         if (ntohs(skb->protocol) == ETH_P_IP)
@@ -166,18 +174,20 @@ HYFI_MC_STATIC unsigned int mc_forward_hook(unsigned int hooknum, struct sk_buff
                 if (((struct net_bridge_port *)qe->port)->dev == out)
                     goto accept;
             }
-            goto drop;
         }
+        goto drop;
     } else if (mc->rp.type == MC_RTPORT_SPECIFY) {
         port = mc_br_port_get(mc->rp.ifindex);
         if (!port || port->dev != out)
             goto drop;
-    } else {
+    } else if (mc->rp.type == MC_RTPORT_DROP) {
         goto drop;
     }
 accept:
+    rcu_read_unlock();
     return NF_ACCEPT;
 drop:
+    rcu_read_unlock();
     return NF_DROP;
 }
 
