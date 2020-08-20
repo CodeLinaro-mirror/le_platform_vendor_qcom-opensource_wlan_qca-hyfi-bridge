@@ -42,6 +42,11 @@ static inline int hyfi_handle_local_out(struct net *net, struct sock *sk, struct
 }
 #endif
 
+/* 500 millsecond delay to enable any host join
+ * before the group is deleted
+ */
+unsigned int leave_delay_msecond = 500;
+
 int mc_group_hash(__be32 mdb_salt, __be32 group)
 {
     __be32 key = get_unaligned(&group);
@@ -967,15 +972,45 @@ static void mc_leave_group(struct mc_struct *mc,
 {
     struct mc_fdb_group *fg;
     struct mc_mdb_entry *mdb;
+    unsigned long  now = jiffies;
+    unsigned long expire_time = mc->membership_interval;
+    unsigned long expire_delay = msecs_to_jiffies(leave_delay_msecond);
 
     spin_lock_bh(&mc->lock);
     fg = mc_fdb_group_get(mc, group, skb, fdb, port);
-    if (fg) {
-        mdb = fg->pg->mdb;
-        mc_fdb_group_destroy(fg);
+    if (!fg) {
+        spin_unlock_bh(&mc->lock);
+        return;
+    }
 
-        if (!atomic_read(&mdb->users))
-            mc_mdb_destroy(mdb);
+    mdb = fg->pg->mdb;
+    if (mdb->group.pro == htons(ETH_P_IP)) {
+        if (mc->rp.igmp_root_qe) {
+            expire_time = mc->rp.igmp_root_qe->max_resp_time
+                + mc->rp.igmp_root_qe->qqic * mc->rp.igmp_root_qe->qrv;
+        }
+#ifdef HYBRID_MC_MLD
+    } else {
+        if (mc->rp.mld_root_qe) {
+            expire_time = mc->rp.mld_root_qe->max_resp_time
+                + mc->rp.mld_root_qe->qqic * mc->rp.mld_root_qe->qrv;
+        }
+#endif
+    }
+    /*
+     * Support several clients share one mac address, not delete the
+     * fdb at once, let's system sent out query to make sure that
+     * there is no more clients.
+     * Once new report received it will update the aging timer
+     * again.
+     */
+    fg->ageing_timer = now - expire_time + expire_delay;
+    if (timer_pending(&mc->atimer) ?
+            time_after(mc->atimer.expires, jiffies + expire_delay) :
+            try_to_del_timer_sync(&mc->atimer) >= 0) {
+        mod_timer(&mc->atimer, jiffies + expire_delay);
+        MC_PRINT("Reset Group Membership Interval ageing timer, expires = %u ms\n",
+                leave_delay_msecond);
     }
     spin_unlock_bh(&mc->lock);
 }
