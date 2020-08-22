@@ -157,6 +157,7 @@ int hyfi_bridge_ipv4_mc_get_if(struct net_device *brdev, __be32 origin, __be32 g
 {
     struct mc_ip mc_group;
     struct mc_ip mc_source;
+    int ret;
 
     memset(&mc_group, 0, sizeof(struct mc_ip));
     mc_group.u.ip4 = group;
@@ -166,7 +167,11 @@ int hyfi_bridge_ipv4_mc_get_if(struct net_device *brdev, __be32 origin, __be32 g
     mc_source.u.ip4 = origin;
     mc_source.pro = htons(ETH_P_IP);
 
-    return  __hyfi_bridge_mc_get_ifs(brdev, &mc_group, &mc_source, max_dst, dst_dev);
+    rcu_read_lock();
+    ret =  __hyfi_bridge_mc_get_ifs(brdev, &mc_group, &mc_source, max_dst, dst_dev);
+    rcu_read_unlock();
+
+    return ret;
 }
 EXPORT_SYMBOL(hyfi_bridge_ipv4_mc_get_if);
 
@@ -207,6 +212,7 @@ int hyfi_bridge_ipv6_mc_get_if(struct net_device *brdev, struct in6_addr *origin
 {
     struct mc_ip mc_group;
     struct mc_ip mc_source;
+    int ret;
 
     memset(&mc_group, 0, sizeof(struct mc_ip));
     hyfi_ipv6_addr_copy(&mc_group.u.ip6, group);
@@ -216,7 +222,11 @@ int hyfi_bridge_ipv6_mc_get_if(struct net_device *brdev, struct in6_addr *origin
     hyfi_ipv6_addr_copy(&mc_source.u.ip6, origin);
     mc_source.pro = htons(ETH_P_IPV6);
 
-    return  __hyfi_bridge_mc_get_ifs(brdev, &mc_group, &mc_source, max_dst, dst_dev);
+    rcu_read_lock();
+    ret =  __hyfi_bridge_mc_get_ifs(brdev, &mc_group, &mc_source, max_dst, dst_dev);
+    rcu_read_unlock();
+
+    return ret;
 }
 EXPORT_SYMBOL(hyfi_bridge_ipv6_mc_get_if);
 
