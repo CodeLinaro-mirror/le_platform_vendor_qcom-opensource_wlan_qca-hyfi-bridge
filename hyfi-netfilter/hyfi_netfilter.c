@@ -398,12 +398,19 @@ int hyfi_netfilter_init(void)
 	int ret = 0;
 
 	/* Register netfilter hooks */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+	ret = nf_register_net_hooks(&init_net, hyfi_hook_ops, ARRAY_SIZE(hyfi_hook_ops));
+#else
 	ret = nf_register_hooks(hyfi_hook_ops, ARRAY_SIZE(hyfi_hook_ops));
-
+#endif
 	return ret;
 }
 
 void hyfi_netfilter_fini(void)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+	nf_unregister_net_hooks(&init_net, hyfi_hook_ops, ARRAY_SIZE(hyfi_hook_ops));
+#else
 	nf_unregister_hooks(hyfi_hook_ops, ARRAY_SIZE(hyfi_hook_ops));
+#endif
 }
