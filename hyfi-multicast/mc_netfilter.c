@@ -181,8 +181,8 @@ HYFI_MC_STATIC unsigned int mc_forward_hook(unsigned int hooknum, struct sk_buff
                 if (((struct net_bridge_port *)qe->port)->dev == out)
                     goto accept;
             }
+            goto drop;
         }
-        goto drop;
     } else if (mc->rp.type == MC_RTPORT_SPECIFY) {
         port = mc_br_port_get(mc->rp.ifindex);
         if (!port || port->dev != out)
