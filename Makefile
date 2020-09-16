@@ -30,7 +30,8 @@ INCLUDES := -I$(CURDIR) \
     -I$(KBUILDPATH)/net/bridge \
     -I$(MDIR)/$(HYFI_NF) \
     -I$(MDIR)/$(HYFI_MC) \
-    -I$(STAGING_DIR)/usr/include/qca-ssdk
+    -I$(STAGING_DIR)/usr/include/qca-ssdk \
+    -I$(STAGING_DIR)/usr/include/emesh-sp
 
 export EXTRA_CFLAGS += $(INCLUDES)
 
