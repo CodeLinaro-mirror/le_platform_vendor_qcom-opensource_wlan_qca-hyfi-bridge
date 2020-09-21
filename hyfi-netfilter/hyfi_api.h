@@ -365,6 +365,9 @@ struct __sp_rule {
 	/// if “match destination mac address” flag bit is set to one,
 	/// this field shall be included, otherwise this field shall be omitted.
 	u_int8_t da[6];
+
+	/// internal field to keep track if rule is valid or not
+	u_int8_t valid;
 };
 
 #endif
