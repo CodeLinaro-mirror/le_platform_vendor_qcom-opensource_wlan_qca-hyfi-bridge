@@ -555,14 +555,22 @@ static void mc_rtimer_reset(struct mc_struct *mc)
             time_after(mc->rtimer.expires, jiffies + expires) :
                 try_to_del_timer_sync(&mc->rtimer) >= 0) {
     	mod_timer(&mc->rtimer, jiffies + expires);
-        MC_PRINT("Reset Querier Interval ageing timer, expires = %u\n", 
+        MC_PRINT("Reset Querier Interval ageing timer, expires = %u\n",
                 jiffies_to_msecs(expires) / 1000);
     }
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+static void mc_mdb_expired(struct timer_list *t)
+#else
 static void mc_mdb_expired(unsigned long data)
+#endif
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+    struct mc_mdb_entry *mdb = from_timer(mdb, t, etimer);
+#else
     struct mc_mdb_entry *mdb = (struct mc_mdb_entry *)data;
+#endif
     struct mc_struct *mc = mdb->mc;
     struct mc_port_group *pg;
     struct hlist_node *pgh;
@@ -600,7 +608,11 @@ static struct mc_mdb_entry *mc_mdb_create(struct mc_struct *mc,
         mdb->group = *group;
         mdb->mc = mc;
         mdb->ageing_query = jiffies;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+        timer_setup(&mdb->etimer, mc_mdb_expired, 0);
+#else
         setup_timer(&mdb->etimer, mc_mdb_expired, (unsigned long)mdb);
+#endif
         hlist_add_head_rcu(&mdb->hlist, head);
     }
     return mdb;
@@ -629,8 +641,11 @@ static struct mc_fdb_group *mc_fdb_group_get(struct mc_struct *mc,
         MC_PRINT("%s: Port group not found\n", __func__);
         return NULL;
     }
-
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+    fg = mc_fdb_group_find(&pg->fslist, fdb->key.addr.addr);
+#else
     fg = mc_fdb_group_find(&pg->fslist, fdb->addr.addr);
+#endif
     if (!fg) {
         MC_PRINT("%s: Fdb group not found\n", __func__);
         return NULL;
@@ -695,7 +710,11 @@ static struct mc_fdb_group *mc_update_mdb(struct mc_struct *mc,
     spin_lock_bh(&mc->lock);
     mdb = mc_mdb_find(head, group);
     if (mdb != NULL) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+        if ((fg = mc_update_hybrid_fdb_group(mc, &mdb->pslist, fdb->key.addr.addr, now, port))) {
+#else
         if ((fg = mc_update_hybrid_fdb_group(mc, &mdb->pslist, fdb->addr.addr, now, port))) {
+#endif
             goto success;
         }
     } else {
@@ -717,7 +736,11 @@ static struct mc_fdb_group *mc_update_mdb(struct mc_struct *mc,
         }
     }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+    fg = mc_fdb_group_find(&pg->fslist, fdb->key.addr.addr);
+#else
     fg = mc_fdb_group_find(&pg->fslist, fdb->addr.addr);
+#endif
     if (fg == NULL) {
         /*Before creating new fdb group, check if it will reach at MAX group*/
         if (atomic_read(&mdb->users) == 0
@@ -725,7 +748,11 @@ static struct mc_fdb_group *mc_update_mdb(struct mc_struct *mc,
             MC_PRINT("%s: Snooping table is full!!\n", __func__);
             goto failure;
         }
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+        fg = mc_fdb_group_create(pg, fdb->key.addr.addr);
+#else
         fg = mc_fdb_group_create(pg, fdb->addr.addr);
+#endif
         if (fg != NULL) {
             if (atomic_inc_return(&mdb->users) == 1)
                 mc->active_group_count++;
@@ -762,9 +789,15 @@ static struct mc_fdb_group *mc_ipv4_report(struct mc_struct *mc,
     mc_group.u.ip4 = group;
     mc_group.pro = htons(ETH_P_IP);
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
     MC_PRINT("%s: Rcv group "MC_IP4_STR" report from "MC_MAC_STR"\n", __func__, 
             MC_IP4_FMT((u8 *)&group), 
+            MC_MAC_FMT(fdb->key.addr.addr));
+#else
+    MC_PRINT("%s: Rcv group "MC_IP4_STR" report from "MC_MAC_STR"\n", __func__,
+            MC_IP4_FMT((u8 *)&group),
             MC_MAC_FMT(fdb->addr.addr));
+#endif
 
     return mc_update_mdb(mc, &mc_group, skb, fdb, port);
 }
@@ -795,10 +828,16 @@ static struct mc_fdb_group *mc_ipv6_report(struct mc_struct *mc,
     hyfi_ipv6_addr_copy(&mc_group.u.ip6, group);
     mc_group.pro = htons(ETH_P_IPV6);
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+    MC_PRINT("%s: Rcv group "MC_IP6_STR" report from "MC_MAC_STR"\n", __func__,
+            MC_IP6_FMT((__be16 *)&mc_group),
+            MC_MAC_FMT(fdb->key.addr.addr));
+#else
     MC_PRINT("%s: Rcv group "MC_IP6_STR" report from "MC_MAC_STR"\n", __func__,
             MC_IP6_FMT((__be16 *)&mc_group),
             MC_MAC_FMT(fdb->addr.addr));
 
+#endif
     return mc_update_mdb(mc, &mc_group, skb, fdb, port);
 }
 
@@ -1024,9 +1063,15 @@ static void mc_ipv4_leave_group(struct mc_struct *mc,
     if (ipv4_is_local_multicast(group))
         return;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
     MC_PRINT("%s: "MC_MAC_STR" leave group "MC_IP4_STR"\n", __func__, 
-            MC_MAC_FMT(fdb->addr.addr), 
+            MC_MAC_FMT(fdb->key.addr.addr),
             MC_IP4_FMT((u8 *)&group));
+#else
+    MC_PRINT("%s: "MC_MAC_STR" leave group "MC_IP4_STR"\n", __func__,
+            MC_MAC_FMT(fdb->addr.addr),
+            MC_IP4_FMT((u8 *)&group));
+#endif
 
     memset(&br_group, 0, sizeof(br_group));
     br_group.u.ip4 = group;
@@ -1049,10 +1094,16 @@ static void mc_ipv6_leave_group(struct mc_struct *mc,
     hyfi_ipv6_addr_copy(&br_group.u.ip6, group);
     br_group.pro = htons(ETH_P_IPV6);
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
     MC_PRINT("%s: "MC_MAC_STR" leave group "MC_IP6_STR"\n", __func__, 
-            MC_MAC_FMT(fdb->addr.addr), 
+            MC_MAC_FMT(fdb->key.addr.addr),
             MC_IP6_FMT((__be16 *)&br_group));
 
+#else
+    MC_PRINT("%s: "MC_MAC_STR" leave group "MC_IP6_STR"\n", __func__,
+            MC_MAC_FMT(fdb->addr.addr),
+            MC_IP6_FMT((__be16 *)&br_group));
+#endif
     mc_leave_group(mc, &br_group, skb, fdb, port);
 }
 #endif
@@ -2595,10 +2646,18 @@ static void mc_dev_rcu_free(struct rcu_head *head)
     kfree(mc);
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+static void mc_router_cleanup(struct timer_list *t)
+#else
 static void mc_router_cleanup(unsigned long data)
+#endif
 {
     int delay_reset = 0;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+    struct mc_struct *mc = from_timer(mc, t, rtimer);
+#else
     struct mc_struct *mc = (struct mc_struct *)data;
+#endif
     unsigned long next_timer = jiffies + mc->querier_interval;
     struct hlist_node *h;
     struct mc_querier_entry *qe;
@@ -2643,10 +2702,18 @@ static void mc_router_cleanup(unsigned long data)
     spin_unlock_bh(&mc->lock);
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+static void mc_mdb_query(struct timer_list *t)
+#else
 static void mc_mdb_query(unsigned long data)
+#endif
 {
     int i;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+    struct mc_struct *mc = from_timer(mc, t, qtimer);
+#else
     struct mc_struct *mc = (struct mc_struct *)data;
+#endif
     unsigned long next_timer = jiffies + mc->local_query_interval;
 
     if (mc->timeout_gmi_enable)
@@ -2687,10 +2754,18 @@ out:
         mod_timer(&mc->qtimer, round_jiffies(next_timer + HZ/4));
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+static void mc_mdb_cleanup(struct timer_list *t)
+#else
 static void mc_mdb_cleanup(unsigned long data)
+#endif
 {
     int i;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+    struct mc_struct *mc = from_timer(mc, t, atimer);
+#else
     struct mc_struct *mc = (struct mc_struct *)data;
+#endif
     struct mc_querier_entry *igmp_root_qe = mc->rp.igmp_root_qe;
     unsigned long next_timer, now = jiffies;
     unsigned long igmp_expire_time = mc->membership_interval;
@@ -2865,9 +2940,18 @@ static void mc_acl_table_init(struct mc_struct *mc)
     return;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+static void mc_event_delay(struct timer_list *t)
+#else
 static void mc_event_delay(unsigned long data)
+#endif
 {
-    mc_netlink_event_send((struct mc_struct *)data,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+    struct mc_struct *mc = from_timer(mc, t, evtimer);;
+#else
+    struct mc_struct *mc = (struct mc_struct *)data;
+#endif
+    mc_netlink_event_send(mc,
             HYFI_EVENT_MC_MDB_UPDATED,
             0,
             NULL);
@@ -2923,6 +3007,16 @@ int mc_attach(struct hyfi_net_bridge *hyfi_br)
     mc->event_pid = MC_INVALID_PID;
 
     mc_acl_table_init(mc);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+    timer_setup(&mc->qtimer, mc_mdb_query,
+            0);
+    timer_setup(&mc->atimer, mc_mdb_cleanup,
+            0);
+    timer_setup(&mc->rtimer, mc_router_cleanup,
+            0);
+    timer_setup(&mc->evtimer, mc_event_delay,
+            0);
+#else
     setup_timer(&mc->qtimer, mc_mdb_query,
             (unsigned long)mc);
     setup_timer(&mc->atimer, mc_mdb_cleanup,
@@ -2931,6 +3025,8 @@ int mc_attach(struct hyfi_net_bridge *hyfi_br)
             (unsigned long)mc);
     setup_timer(&mc->evtimer, mc_event_delay,
             (unsigned long)mc);
+
+#endif
 
     hyfi_br->mc = mc;
 

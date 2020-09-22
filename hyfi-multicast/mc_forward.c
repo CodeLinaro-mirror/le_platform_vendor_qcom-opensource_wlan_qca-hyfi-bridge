@@ -114,7 +114,11 @@ static void mc_encap_hook(struct net_bridge *br,
         if (forward)
             hyfi_br_forward(pdst, skb);
         else
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+            br_forward(pdst, skb, false, true);
+#else
             br_deliver(pdst, skb);
+#endif
     }
 out: 
     if (skb && !pdst)
@@ -202,7 +206,11 @@ static void mc_flood_hook(__be32 ifindex, struct sk_buff *skb, int forward)
         hyfi_br_forward(br_port, skb);
     }
     else {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+        br_forward(br_port, skb, false, true);
+#else
         br_deliver(br_port, skb);
+#endif
     }
 out:
     dev_put(dev);
