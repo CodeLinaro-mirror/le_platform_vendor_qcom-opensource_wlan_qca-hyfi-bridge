@@ -32,6 +32,11 @@ INCLUDES := -I$(CURDIR) \
     -I$(MDIR)/$(HYFI_MC) \
     -I$(STAGING_DIR)/usr/include/qca-ssdk
 
+ifeq ($(strip ${HYFI_BRIDGE_EMESH_ENABLE}),1)
+ccflags-y+=-DHYFI_BRIDGE_EMESH_ENABLE
+INCLUDES+= -I$(STAGING_DIR)/usr/include/emesh-sp
+endif
+
 export EXTRA_CFLAGS += $(INCLUDES)
 
 # Module extra compilation flags

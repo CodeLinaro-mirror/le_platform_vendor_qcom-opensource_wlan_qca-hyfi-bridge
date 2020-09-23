@@ -26,6 +26,9 @@
 #include "hyfi_hatbl.h"
 #include "hyfi_hdtbl.h"
 #include "hyfi_fdb.h"
+#ifdef HYFI_BRIDGE_EMESH_ENABLE
+#include <sp_api.h>
+#endif
 #include "hyfi_netlink.h"
 /* ref_port_ctrl.h and ref_fdb.h header file is  platform dependent code and this
    is not required for 3rd party platform. So avoided this header file inclusion
@@ -35,7 +38,6 @@
 #include "ref/ref_port_ctrl.h"
 #include "ref/ref_fdb.h"
 #endif
-
 static struct sock *hyfi_nl_sk = NULL;
 static struct sock *hyfi_nl_event_sk = NULL;
 
@@ -535,6 +537,58 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				break;
 			}
 			case HYFI_SET_SP_RULE:{
+
+#ifdef HYFI_BRIDGE_EMESH_ENABLE
+				struct __sp_rule *msg_value = (struct __sp_rule *)hymsgdata;
+				struct sp_rule to_emesh_sp = {0};
+				int i=0;
+
+				to_emesh_sp.id = msg_value->id;
+
+				if(msg_value->add_delete_rule == 0)
+					to_emesh_sp.cmd = SP_MAPDB_ADD_REMOVE_FILTER_DELETE;
+				else if(msg_value->add_delete_rule == 1)
+					to_emesh_sp.cmd = SP_MAPDB_ADD_REMOVE_FILTER_ADD;
+				else {
+					printk(" \n Invalid add/delete rule %d \n", msg_value->add_delete_rule);
+					break;
+				}
+
+				to_emesh_sp.rule_precedence = msg_value->rule_precedence;
+
+				to_emesh_sp.inner.rule_output = msg_value->rule_output;
+
+				if(msg_value->rule_match_always_true)
+					to_emesh_sp.inner.flags |= SP_RULE_FLAG_MATCH_ALWAYS_TRUE;
+
+				if(msg_value->matchup)
+					to_emesh_sp.inner.flags |= SP_RULE_FLAG_MATCH_UP;
+
+				if(msg_value->match_up_sense)
+					to_emesh_sp.inner.flags |= SP_RULE_FLAG_MATCH_UP_SENSE;
+
+				if(msg_value->match_source_mac)
+					to_emesh_sp.inner.flags |= SP_RULE_FLAG_MATCH_SOURCE_MAC;
+
+				if(msg_value->match_source_mac_sense)
+					to_emesh_sp.inner.flags |= SP_RULE_FLAG_MATCH_SOURCE_MAC_SENSE;
+
+				if(msg_value->match_dst_mac)
+					to_emesh_sp.inner.flags |= SP_RULE_FLAG_MATCH_DST_MAC;
+
+				if(msg_value->match_dst_mac_sense)
+					to_emesh_sp.inner.flags |= SP_RULE_FLAG_MATCH_DST_MAC_SENSE;
+
+				to_emesh_sp.inner.user_priority = msg_value->user_priority;
+
+				for(i=0;i<ETH_ALEN;i++) {
+					to_emesh_sp.inner.sa[i] = msg_value->sa[i];
+					to_emesh_sp.inner.da[i] = msg_value->da[i];
+				}
+
+				sp_mapdb_rule_update(&to_emesh_sp);
+#endif
+
 				break;
 			}
 			default:
