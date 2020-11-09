@@ -100,10 +100,12 @@ void hyfi_hatbl_cleanup(unsigned long _data)
 		}
 	}
 
+	spin_unlock_bh(&br->hash_ha_lock);
+
 	if (aging) {
 		hyfi_netlink_event_send(br, HYFI_EVENT_AGEOUT_HA_ENTRIES, 0, NULL);
 	}
-	spin_unlock_bh(&br->hash_ha_lock);
+
 	/* Add HZ/4 to ensure we round the jiffies upwards to be after the next
 	 * timer, otherwise we might round down and will have no-op run. */
 	mod_timer(&br->hatbl_timer, round_jiffies(next_timer + HZ / 4));
@@ -476,19 +478,19 @@ struct net_hatbl_entry* hyfi_hatbl_insert(struct hyfi_net_bridge *br,
 {
 	struct net_hatbl_entry *ha = NULL;
 
-	spin_lock_bh(&br->hash_ha_lock);
+	spin_lock(&br->hash_ha_lock);
 	ha = hatbl_find_before_create(br, hash,
 		sub_class == HYFI_TRAFFIC_CLASS_UDP ?
 			hd->dst_udp : hd->dst_other, sa, hd->addr.addr,
 		hd->id.addr, sub_class, priority,
 		hyfi_hd_has_flag(hd, HYFI_HDTBL_STATIC_ENTRY));
 
+	spin_unlock(&br->hash_ha_lock);
 
 	if (ha) {
 		hyfi_netlink_event_send(ha->hyfi_br, HYFI_EVENT_ADD_HA_ENTRY,
 				sizeof(struct __hatbl_entry), ha);
 	}
-	spin_unlock_bh(&br->hash_ha_lock);
 	return ha;
 }
 
@@ -510,8 +512,9 @@ struct net_hatbl_entry* hyfi_hatbl_insert_ecm_classifier(struct hyfi_net_bridge 
 
 		hyfi_netlink_event_send(ha->hyfi_br, HYFI_EVENT_ADD_HA_ENTRY,
 				sizeof(struct __hatbl_entry), ha);
+	} else {
+		spin_unlock_bh(&br->hash_ha_lock);
 	}
-	spin_unlock_bh(&br->hash_ha_lock);
 	return ha;
 }
 
@@ -738,15 +741,16 @@ struct net_hatbl_entry* hyfi_hatbl_insert_from_fdb(struct hyfi_net_bridge *br,
 {
 	struct net_hatbl_entry *ha = NULL;
 
-	spin_lock_bh(&br->hash_ha_lock);
+	spin_lock(&br->hash_ha_lock);
 
 	ha = hatbl_find_before_create(br, hash, dst, sa, da, id, sub_class, priority, 1);
 
 	if (keep_lock && ha) {
 		hyfi_netlink_event_send(ha->hyfi_br, HYFI_EVENT_ADD_HA_ENTRY,
 			sizeof(struct __hatbl_entry), ha);
+	} else {
+		spin_unlock(&br->hash_ha_lock);
 	}
-	spin_unlock_bh(&br->hash_ha_lock);
 
 	return ha;
 }
