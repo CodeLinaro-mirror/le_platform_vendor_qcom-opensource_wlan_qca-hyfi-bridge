@@ -155,7 +155,11 @@ unsigned int hyfi_netfilter_forwarding_hook(unsigned int hooknum,
 		return NF_ACCEPT;
 
 	if (unlikely(hyfi_br->TSEnabled)) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+		if (skb_vlan_tag_present(skb)) {
+#else
 		if (unlikely(skb->vlan_tci != 0)) {
+#endif
 			return NF_DROP;
 		}
 	}
@@ -281,7 +285,11 @@ unsigned int hyfi_netfilter_local_in_hook(unsigned int hooknum,
 		return NF_ACCEPT;
 
 	if (unlikely(hyfi_br->TSEnabled)) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+		if (skb_vlan_tag_present(skb)) {
+#else
 		if (unlikely(skb->vlan_tci != 0)) {
+#endif
 			return NF_DROP;
 		}
 	}
