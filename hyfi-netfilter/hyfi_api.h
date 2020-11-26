@@ -365,6 +365,77 @@ struct __sp_rule {
 	/// if “match destination mac address” flag bit is set to one,
 	/// this field shall be included, otherwise this field shall be omitted.
 	u_int8_t da[6];
+
+	/// internal field to keep track if rule is valid or not
+	u_int8_t valid_qsp;
+
+	/// Match Source IPv4 Address flag
+	u_int8_t match_source_ipv4;
+	/// Match Source IPv4 Address sense
+	u_int8_t match_source_ipv4_sense;
+	/// Match Destination IPv4 Address flags
+	u_int8_t match_dst_ipv4;
+	/// Destination IPv4 Address Match Sense Flag
+	u_int8_t match_dst_ipv4_sense;
+
+	/// Match Source IPv6 Address flag
+	u_int8_t match_source_ipv6;
+	/// Match Source IPv6 Address sense
+	u_int8_t match_source_ipv6_sense;
+	/// Match Destination IPv6 Address flags
+	u_int8_t match_dst_ipv6;
+	/// Destination IPv6 Address Match Sense Flag
+	u_int8_t match_dst_ipv6Sense;
+
+	/// Match Source port flag
+	u_int8_t match_source_port;
+	/// Match Source port sense
+	u_int8_t match_source_port_sense;
+	/// Match Destination port flags
+	u_int8_t match_dst_port;
+	/// Destination port Match Sense Flag
+	u_int8_t match_dst_port_sense;
+
+	/// Match protocol number or next header flag
+	u_int8_t match_protocol_number;
+	/// Match protocol number or next header Match sense flag
+	u_int8_t match_protocol_number_sense;
+	/// Match VLAN ID flags
+	u_int8_t match_vlan_id;
+	/// Match VLAN ID Match sense flags
+	u_int8_t match_vlan_id_sense;
+
+	/// Source IPv4 Address
+	/// If “Match Source IPv4 Address” flag bit is set to one,
+	/// this field shall be included, otherwise this field shall be omitted.
+	u_int32_t src_ipv4_addr;
+	/// Source IPv6 Address
+	/// If “Match Source IPv6 Address” flag bit is set to one,
+	/// this field shall be included, otherwise this field shall be omitted.
+	u_int32_t src_ipv6_addr[4];
+	/// Destination IPv4 Address
+	/// If “Match Destination IPv4 Address” flag bit is set to one,
+	/// this field shall be included, otherwise this field shall be omitted.
+	u_int32_t dst_ipv4_addr;
+	/// Destination IPv6 Address
+	/// If “Match Destination IPv6 Address” flag bit is set to one,
+	/// this field shall be included, otherwise this field shall be omitted.
+	u_int32_t dst_ipv6_addr[4];
+	/// Source Port
+	u_int16_t src_port;
+	/// Destination Port
+	u_int16_t dst_port;
+	/// Protocol Number or Next Header
+	u_int8_t protocol_number;
+	/// VLAN ID
+	u_int16_t vlan_id;
+	/// DSCP value
+	u_int8_t dscp;
+	/// Service interval
+	u_int8_t service_interval;
+	/// Burst size
+	uint32_t burst_size;
+
 };
 
 #endif
