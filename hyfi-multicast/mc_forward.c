@@ -25,6 +25,7 @@
 #include "hyfi_osdep.h"
 #include "hyfi_bridge.h"
 #include "hyfi_hatbl.h"
+#include "hyfi_filters.h"
 
 static void mc_retag(void *iph, __be16 etype, __be32 dscp)
 {
@@ -371,6 +372,35 @@ static int mc_convert(struct mc_struct *mc, struct sk_buff *skb, int forward)
             break;
 #endif
         default:
+            if (hyfi_is_ieee1905_pkt(skb)) {
+                struct net_bridge_fdb_entry *hsrc;
+                struct sk_buff *skb2;
+                unsigned char *dest_addr, *src_addr;
+                struct hyfi_net_bridge *hyfi_br;
+                const struct net_bridge *br;
+
+                src_addr = eth_hdr(skb)->h_source;
+                dest_addr = eth_hdr(skb)->h_dest;
+                br = netdev_priv(BR_INPUT_SKB_CB(skb)->brdev);
+                hyfi_br = hyfi_bridge_get(br);
+
+                if (unlikely(!br || !hyfi_br || !hyfi_br->dev || br->dev != hyfi_br->dev)) {
+                    goto out;
+                }
+
+                if ((hsrc = os_br_fdb_get((struct net_bridge *) br, eth_hdr(skb)->h_source)) && hsrc->is_local) {
+                    hyfi_ieee1905_frame_filter(skb, skb->dev);
+                    skb2 = skb_clone(skb, GFP_ATOMIC);
+                    if (skb2) {
+                        skb2->dev = hyfi_br->dev;
+                        netif_receive_skb(skb2);
+                        if (hyfi_ieee1905_msg_type(skb2) == 0) {
+                            kfree_skb(skb);
+                            return 0;
+                        }
+                    }
+                }
+            }
             goto out;
     }
 
