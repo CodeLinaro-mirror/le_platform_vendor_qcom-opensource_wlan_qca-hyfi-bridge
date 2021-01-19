@@ -614,7 +614,6 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 						   msg_value->da[2], msg_value->da[3],
 						   msg_value->da[4], msg_value->da[5]);
 
-				#if 0
 				if (msg_value->valid_qsp)
 				{
 					if (msg_value->match_source_ipv4)
@@ -709,7 +708,6 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 					to_emesh_sp.inner.burst_size = msg_value->burst_size;
 					DEBUG_INFO("burst_size = 0x%x \n", msg_value->burst_size);
 				}
-				#endif
 
 				sp_mapdb_rule_update(&to_emesh_sp);
 #endif
