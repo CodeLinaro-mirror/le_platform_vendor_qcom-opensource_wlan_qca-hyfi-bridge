@@ -248,7 +248,7 @@ void hyfi_psw_send_pkt(struct hyfi_net_bridge *br, struct net_hatbl_entry *ha,
 	skb->dev = br->dev;
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
-	br_forward(ha->dst, skb, false, false);
+	br_forward(ha->dst, skb, false, true);
 #else
 	br_deliver(ha->dst, skb);
 #endif
