@@ -668,6 +668,13 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 						to_emesh_sp.inner.flags |= SP_RULE_FLAG_MATCH_VLAN_ID_SENSE;
 					DEBUG_INFO("match_vlan_id_sense = 0x%x \n", msg_value->match_vlan_id_sense);
 
+					if (msg_value->match_dscp)
+						to_emesh_sp.inner.flags |= SP_RULE_FLAG_MATCH_DSCP;
+					DEBUG_INFO("match_dscp = 0x%x \n", msg_value->match_dscp);
+					if (msg_value->match_dscp_sense)
+						to_emesh_sp.inner.flags |= SP_RULE_FLAG_MATCH_DSCP_SENSE;
+					DEBUG_INFO("match_dscp_sense = 0x%x \n", msg_value->match_dscp_sense);
+
 					to_emesh_sp.inner.src_ipv4_addr = msg_value->src_ipv4_addr;
 					DEBUG_INFO("src_ipv4 = %d.%d.%d.%d \n", (msg_value->src_ipv4_addr & 0x000000FF),
 							   (msg_value->src_ipv4_addr & 0x0000FF00) >> 8,

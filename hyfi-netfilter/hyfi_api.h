@@ -405,6 +405,11 @@ struct __sp_rule {
 	/// Match VLAN ID Match sense flags
 	u_int8_t match_vlan_id_sense;
 
+	/// Match dscp flags
+	u_int8_t match_dscp;
+	/// Match dscp Match semse flags
+	u_int8_t match_dscp_sense;
+
 	/// Source IPv4 Address
 	/// If “Match Source IPv4 Address” flag bit is set to one,
 	/// this field shall be included, otherwise this field shall be omitted.
