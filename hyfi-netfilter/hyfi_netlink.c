@@ -721,6 +721,15 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 
 				break;
 			}
+			case HYFI_FLUSH_SP_RULES:{
+
+#ifdef HYFI_BRIDGE_EMESH_ENABLE
+				DEBUG_INFO(" \n *** Recieved Flush SP rule. *** \n");
+				sp_mapdb_ruletable_flush();
+#endif
+
+				break;
+			}
 			default:
 				DEBUG_WARN("hyfi: Unknown message type 0x%x\n", msgtype);
 				hymsghdr->status = HYFI_STATUS_INVALID_PARAMETER;

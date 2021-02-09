@@ -123,6 +123,7 @@ enum {
 	HYFI_PSW_LAST,
 
 	HYFI_SET_SP_RULE = 0x700, /* Service priortization rule */
+	HYFI_FLUSH_SP_RULES,
 };
 
 /* Bridge mode:
