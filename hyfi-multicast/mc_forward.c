@@ -394,7 +394,7 @@ static int mc_convert(struct mc_struct *mc, struct sk_buff *skb, int forward)
                     if (skb2) {
                         skb2->dev = hyfi_br->dev;
                         netif_receive_skb(skb2);
-                        if (hyfi_ieee1905_msg_type(skb2) == 0) {
+                        if (hyfi_ieee1905_msg_type(skb) == 0) {
                             kfree_skb(skb);
                             return 0;
                         }
