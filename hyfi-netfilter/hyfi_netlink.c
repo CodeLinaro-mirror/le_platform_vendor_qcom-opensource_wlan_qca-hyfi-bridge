@@ -792,6 +792,11 @@ void hyfi_netlink_event_send(struct hyfi_net_bridge *br,
 	case HYFI_EVENT_ADD_HA_ENTRY:
 		ha = (struct net_hatbl_entry *) event_data;
 		hae = (struct __hatbl_entry *) NLMSG_DATA( nlh );
+		if(!ha || !ha->dst || !ha->dst->dev) {
+			DEBUG_ERROR("hyfi: ADD_HA-entry is NULL\n");
+			send_msg = false;
+			break;
+		}
 		memcpy(hae->da, ha->da.addr, ETH_ALEN);
 		memcpy(hae->sa, ha->sa.addr, ETH_ALEN);
 		memcpy(hae->id, ha->id.addr, ETH_ALEN);
@@ -803,6 +808,11 @@ void hyfi_netlink_event_send(struct hyfi_net_bridge *br,
 	case HYFI_EVENT_DEL_HA_ENTRY:
 		ha = (struct net_hatbl_entry *) event_data;
 		hae = (struct __hatbl_entry *) NLMSG_DATA( nlh );
+		if(!ha || !ha->dst || !ha->dst->dev) {
+			DEBUG_ERROR("hyfi: DEL_HA-entry is NULL\n");
+			send_msg = false;
+			break;
+		}
 		memcpy(hae->da, ha->da.addr, ETH_ALEN);
 		memcpy(hae->sa, ha->sa.addr, ETH_ALEN);
 		memcpy(hae->id, ha->id.addr, ETH_ALEN);
