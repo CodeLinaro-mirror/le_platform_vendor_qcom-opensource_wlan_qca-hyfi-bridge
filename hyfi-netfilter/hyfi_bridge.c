@@ -309,7 +309,7 @@ struct hyfi_net_bridge_port *hyfi_bridge_get_port_by_dev(const struct net_device
 		return NULL;
 
 	list_for_each_entry_rcu(hyfi_p, &hyfi_br->port_list, list) {
-		if (hyfi_p->dev == dev) {
+		if (hyfi_p && hyfi_p->dev == dev) {
 			return hyfi_p;
 		}
 	}
