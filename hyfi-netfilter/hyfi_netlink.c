@@ -710,10 +710,15 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 
 					to_emesh_sp.inner.dscp = msg_value->dscp;
 					DEBUG_INFO("dscp = 0x%x \n", msg_value->dscp);
-					to_emesh_sp.inner.service_interval = msg_value->service_interval;
-					DEBUG_INFO("service_interval = 0x%x \n", msg_value->service_interval);
-					to_emesh_sp.inner.burst_size = msg_value->burst_size;
-					DEBUG_INFO("burst_size = 0x%x \n", msg_value->burst_size);
+
+					to_emesh_sp.inner.service_interval_dl = msg_value->service_interval_dl;
+					DEBUG_INFO("service_interval_dl = 0x%x \n", msg_value->service_interval_dl);
+					to_emesh_sp.inner.service_interval_ul = msg_value->service_interval_ul;
+					DEBUG_INFO("service_interval_ul = 0x%x \n", msg_value->service_interval_ul);
+					to_emesh_sp.inner.burst_size_dl = msg_value->burst_size_dl;
+					DEBUG_INFO("burst_size_dl = 0x%x \n", msg_value->burst_size_dl);
+					to_emesh_sp.inner.burst_size_ul = msg_value->burst_size_ul;
+					DEBUG_INFO("burst_size_ul = 0x%x \n", msg_value->burst_size_ul);
 				}
 
 				sp_mapdb_rule_update(&to_emesh_sp);

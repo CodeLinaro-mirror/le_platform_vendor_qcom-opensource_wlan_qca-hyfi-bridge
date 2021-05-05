@@ -437,11 +437,14 @@ struct __sp_rule {
 	u_int16_t vlan_id;
 	/// DSCP value
 	u_int8_t dscp;
-	/// Service interval
-	u_int8_t service_interval;
-	/// Burst size
-	uint32_t burst_size;
-
+	/// Service interval downlink
+	u_int8_t service_interval_dl;
+	/// Service interval uplink
+	u_int8_t service_interval_ul;
+	/// Burst size downlink
+	uint32_t burst_size_dl;
+	/// Burst size uplink
+	uint32_t burst_size_ul;
 };
 
 #endif
