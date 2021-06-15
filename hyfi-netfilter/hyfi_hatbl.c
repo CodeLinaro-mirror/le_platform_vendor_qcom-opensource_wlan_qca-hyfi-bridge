@@ -158,6 +158,10 @@ void hyfi_hatbl_delete_by_port(struct hyfi_net_bridge *br,
 
 static void hatbl_fillbuf(struct net_hatbl_entry *ha, struct __hatbl_entry *hae)
 {
+        if(!ha || !ha->dst || !ha->dst->dev) {
+             DEBUG_ERROR("hyfi: ADD_HA-entry is NULL\n");
+             return;
+        }
 	memcpy(hae->da, ha->da.addr, ETH_ALEN);
 	memcpy(hae->sa, ha->sa.addr, ETH_ALEN);
 	memcpy(hae->id, ha->id.addr, ETH_ALEN);
