@@ -41,6 +41,78 @@
 static struct sock *hyfi_nl_sk = NULL;
 static struct sock *hyfi_nl_event_sk = NULL;
 
+/**
+ * hyfi_find_version_compatibility_number : parse and decode compatibility number from version string
+ * @ver_str: input version string
+ * @comp_num : output compatibility number
+ * return 0 on success and -1 on failure
+ */
+static int hyfi_find_version_compatibility_number(char *ver_str, int *comp_num)
+{
+#define VERSION_SEGMENT_TOTAL 4
+    int ret = 0;
+    uint32_t maj, min, com, build;
+    char *ptr_ver = ver_str;
+
+    ptr_ver = strchr(ver_str, '-');
+    if (!ptr_ver)
+        return -1;
+
+    ptr_ver++;
+    ret = sscanf(ptr_ver, "%u.%u.%u.%u", &maj, &min, &com, &build);
+
+    DEBUG_INFO("Version string decode data[%d]: maj[%u] min[%u] com[%u] build[%u] \n", ret, maj, min, com, build);
+
+    if (ret == VERSION_SEGMENT_TOTAL)
+    {
+        DEBUG_INFO("[%s]: compatibility number found \n", __func__);
+        *comp_num = com;
+        return 0;
+    }
+
+    DEBUG_ERROR("[%s]: compatibility number not found \n", __func__);
+#undef VERSION_SEGMENT_TOTAL
+    return -1;
+}
+
+/**
+ * hyfi_mesh_version_compatibility_check : perform version compatibility check
+ * @ver_str: input version string
+ * return 0 on compatible version, 1 on in-compatible version and -1 on failure
+ */
+static int hyfi_mesh_version_compatibility_check(char *ver_str)
+{
+	int driv_ver_comp = -1, app_ver_comp = -1, ret = -1;
+
+	DEBUG_INFO("%s: Received Mesh Application Version String [%s], Length : [%zu]",
+		__func__, ver_str, strlen(ver_str));
+
+	/* Get compatibility number from driver version string */
+	if (hyfi_find_version_compatibility_number(ver_str, &app_ver_comp) < 0 ) {
+		DEBUG_ERROR("Unable to find the Application compatibilty number !!!\n");
+	}
+
+	/* Parse the version string and match the compatibility number */
+	if (strstr(ver_str, "son") && (hyfi_find_version_compatibility_number(HYFI_BRIDGE_SON_DRIVER_VERSION, &driv_ver_comp) < 0) ) {
+		DEBUG_ERROR("Unable to find the SON driver compatibilty number !!!\n");
+	}
+	else if (strstr(ver_str, "easymesh") && (hyfi_find_version_compatibility_number(HYFI_BRIDGE_MAP_DRIVER_VERSION, &driv_ver_comp) < 0) ) {
+		DEBUG_ERROR("Unable to find the EasyMesh driver compatibilty number !!!\n");
+	}
+
+	if (driv_ver_comp >= 0 && app_ver_comp >= 0) {
+		if (driv_ver_comp == app_ver_comp) {
+			/* Compatibility Matched */
+			ret = 0;
+		} else {
+			/* Compatiblity Not Matched */
+			ret = 1;
+		}
+	}
+	return ret;
+}
+
+
 static void hyfi_netlink_receive(struct sk_buff *__skb)
 {
 	struct net_device *brdev = NULL;
@@ -735,6 +807,27 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 
 				break;
 			}
+			case HYFI_VERSION_COMPATIBILITY_CHECK:
+			{
+				int ret = -1;
+				char *data = hymsgdata;
+				DEBUG_INFO(" \n *** Recieved Version Compatibilty request ***\n");
+				DEBUG_INFO("ver_str[%s] len[%zu]\n", data, strlen(data));
+
+				/* parse version string and perform version compatibility with driver version*/
+				ret = hyfi_mesh_version_compatibility_check(data);
+
+				/* assign return status */
+				if ( ret == 0 ) {
+					hymsghdr->status = HYFI_STATUS_SUCCESS;
+				} else if (ret == 1) {
+					hymsghdr->status = HYFI_STATUS_FAILURE;
+				} else {
+					hymsghdr->status = HYFI_STATUS_NOT_FOUND;
+				}
+				break;
+			};
+
 			default:
 				DEBUG_WARN("hyfi: Unknown message type 0x%x\n", msgtype);
 				hymsghdr->status = HYFI_STATUS_INVALID_PARAMETER;
