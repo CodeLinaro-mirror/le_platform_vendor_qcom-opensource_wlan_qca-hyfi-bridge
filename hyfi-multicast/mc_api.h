@@ -45,6 +45,8 @@ enum
     HYFI_GET_MC_MDB,
     HYFI_SET_MC_ROUTER,
     HYFI_GET_MC_ROUTER_PORT,
+    HYFI_SET_MC_MAX_GROUP,
+    HYFI_GET_MC_MAX_GROUP,
 };
 
 /* netlink event type */
@@ -134,7 +136,8 @@ struct __mc_param_timeout
 #define HYFI_MC_DEV_MAX       16
 #define HYFI_MC_IF_MAX        16
 #define HYFI_MC_IF_NODE_MAX   8
-#define HYFI_MC_GROUP_MAX     16
+#define HYFI_MC_GROUP_MAX     256
+#define HYFI_MC_GROUP_MIN     16
 #define HYFI_MC_IP6_SIZE      16
 #define HYFI_MC_INCLUDE       1
 #define HYFI_MC_EXCLUDE       2

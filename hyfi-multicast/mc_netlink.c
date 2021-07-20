@@ -487,6 +487,7 @@ static void mc_set_psw_flood(struct mc_struct *mc, void *param, __be32 param_len
     for (i = 0; i < MC_HASH_SIZE; i++) {
         struct mc_mdb_entry *mdb;
         struct hlist_node *mdbh;
+
         os_hlist_for_each_entry_rcu(mdb, mdbh, &mc->hash[i], hlist) {
             entry_changed = 0;
 
@@ -744,6 +745,23 @@ static void __mc_netlink_receive(struct sk_buff *__skb)
                     if (mc_rtports_fillbuf(mc, hymsgdata, hymsghdr->buf_len,
                                 &hymsghdr->bytes_written, &hymsghdr->bytes_needed))
                         hymsghdr->status = HYFI_STATUS_BUFFER_OVERFLOW;
+                }
+                break;
+            case HYFI_SET_MC_MAX_GROUP:
+                {
+                    struct __mc_param_value *e = (struct __mc_param_value *)hymsgdata;
+                    if ( e->val >= MC_GROUP_MIN && e->val <= MC_GROUP_MAX )
+                        mc->max_group_cnt = e->val;
+                    else
+                        mc->max_group_cnt = MC_GROUP_MIN;
+                    MC_PRINT(KERN_INFO "%s: HYFI_SET_MC_MAX_GROUP:%d max_group_cnt:%d\n", __func__, e->val,mc->max_group_cnt);
+                }
+                break;
+            case HYFI_GET_MC_MAX_GROUP:
+                {
+                    struct __mc_param_value *e = (struct __mc_param_value *)hymsgdata;
+                    e->val = mc->max_group_cnt;
+                    MC_PRINT(KERN_INFO "%s: max_group_cnt:%d\n", __func__, mc->max_group_cnt);
                 }
                 break;
             default:

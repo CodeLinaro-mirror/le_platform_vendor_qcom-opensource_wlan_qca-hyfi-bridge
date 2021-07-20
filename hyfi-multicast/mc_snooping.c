@@ -593,7 +593,7 @@ static struct mc_mdb_entry *mc_mdb_create(struct mc_struct *mc,
 {
     struct mc_mdb_entry *mdb;
 
-    if (mc->active_group_count >= MC_GROUP_MAX) {
+    if (mc->active_group_count >= mc->max_group_cnt) {
 	    MC_PRINT("%s: Snooping table is full!!\n", __func__);
 	    return NULL;
     }
@@ -715,7 +715,7 @@ static struct mc_fdb_group *mc_update_mdb(struct mc_struct *mc,
             goto success;
         }
     } else {
-        if (mc->active_group_count < MC_GROUP_MAX) {
+        if (mc->active_group_count < mc->max_group_cnt) {
             mdb = mc_mdb_create(mc, head, group);
         } else {
             MC_PRINT("%s: Snooping table is full!!\n", __func__);
@@ -741,7 +741,7 @@ static struct mc_fdb_group *mc_update_mdb(struct mc_struct *mc,
     if (fg == NULL) {
         /*Before creating new fdb group, check if it will reach at MAX group*/
         if (atomic_read(&mdb->users) == 0
-                && mc->active_group_count >= MC_GROUP_MAX) {
+                && mc->active_group_count >= mc->max_group_cnt) {
             MC_PRINT("%s: Snooping table is full!!\n", __func__);
             goto failure;
         }
@@ -2586,6 +2586,7 @@ int mc_open(struct hyfi_net_bridge *hyfi_br, struct mc_struct *mc)
 
     mc->ageing_query = jiffies;
     mc->startup_queries_sent = 0;
+    mc->max_group_cnt = MC_GROUP_MIN;
     mc->started = 1;
 
     /* Start aging timer and query timer now */

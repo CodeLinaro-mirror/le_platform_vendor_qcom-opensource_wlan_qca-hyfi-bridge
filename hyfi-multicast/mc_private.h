@@ -100,6 +100,7 @@ struct mld2_query {
 #define MC_DEFAULT_DSCP     0x28
 #define MC_DSCP(x)          (x << 2)
 #define MC_GROUP_MAX        HYFI_MC_GROUP_MAX
+#define MC_GROUP_MIN        HYFI_MC_GROUP_MIN
 #define MC_SRC_GROUP_MAX    HYFI_MC_SRCS_MAX
 #define MC_RT_SRC_MAX       HYFI_MC_RT_SRCS_MAX
 #define MC_ENCAP_DEV_MAX    HYFI_MC_DEV_MAX
@@ -195,6 +196,7 @@ struct mc_struct {
     __be32                  active_group_count;
     struct hlist_head       hash[MC_HASH_SIZE];
     __be32                  debug;
+    __be32                  max_group_cnt;
     __be32                  forward_policy;
     __be32                  last_member_count;
     __be32                  startup_queries_sent;
