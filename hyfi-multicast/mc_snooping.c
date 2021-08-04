@@ -1941,9 +1941,6 @@ static void mc_ipv4_query(struct mc_struct *mc, struct sk_buff *skb,
     __be32 group;
     unsigned long max_resp_time, qqic, qrv;
 
-    if (!iph->saddr)
-        return;
-
     MC_PRINT("%s: Rcv group "MC_IP4_STR" query from port %s\n", __func__, 
             MC_IP4_FMT((u8 *)&iph->saddr), 
             port->dev->name);
@@ -2176,10 +2173,6 @@ static int mc_ipv4_rcv(struct mc_struct *mc, struct sk_buff *skb,
     MC_SKB_CB(skb)->igmp = 1;
     MC_SKB_CB(skb)->mdb = NULL;
     ih = igmp_hdr(skb2);
-
-    if (ih->type != IGMP_HOST_MEMBERSHIP_QUERY && 
-            mc_querier_entry_find(&mc->rp.igmp_rlist, port))
-        goto out;
 
     err = 0;
     switch (ih->type) {
