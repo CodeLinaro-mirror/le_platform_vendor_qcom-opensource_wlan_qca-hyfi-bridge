@@ -839,7 +839,11 @@ void hyfi_hatbl_mark_decelerated(struct net_hatbl_entry *ha)
 
 void hyfi_hatbl_free(void)
 {
-	kmem_cache_destroy(hyfi_hatbl_cache);
+	if (hyfi_hatbl_cache) {
+		kmem_cache_destroy(hyfi_hatbl_cache);
+		hyfi_hatbl_cache = NULL;
+	}
+
 }
 
 void hyfi_hatbl_fini(struct hyfi_net_bridge *br)
@@ -866,8 +870,6 @@ void hyfi_hatbl_fini(struct hyfi_net_bridge *br)
 	}
 
 	spin_unlock_bh(&br->hash_ha_lock);
-
-	kmem_cache_destroy(hyfi_hatbl_cache);
 }
 
 unsigned long hyfi_hatbl_calculate_elapsed_time(unsigned long time_now,

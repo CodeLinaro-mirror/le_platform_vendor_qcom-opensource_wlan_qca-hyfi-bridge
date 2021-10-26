@@ -405,6 +405,14 @@ int __init hyfi_hdtbl_init(void)
 	return 0;
 }
 
+void hyfi_hdtbl_free(void)
+{
+	if (hyfi_hdtbl_cache) {
+		kmem_cache_destroy(hyfi_hdtbl_cache);
+		hyfi_hdtbl_cache = NULL;
+	}
+}
+
 void hyfi_hdtbl_fini(struct hyfi_net_bridge *br)
 {
 	u_int32_t i;
@@ -427,7 +435,4 @@ void hyfi_hdtbl_fini(struct hyfi_net_bridge *br)
 	}
 
 	spin_unlock_bh(&br->hash_hd_lock);
-
-	/* Destroy the HD-Table cache */
-	kmem_cache_destroy(hyfi_hdtbl_cache);
 }
