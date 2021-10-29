@@ -989,5 +989,6 @@ void __exit hyfi_bridge_fini(void)
 	}
 
 	hyfi_hatbl_free();
+	hyfi_hdtbl_free();
 
 }

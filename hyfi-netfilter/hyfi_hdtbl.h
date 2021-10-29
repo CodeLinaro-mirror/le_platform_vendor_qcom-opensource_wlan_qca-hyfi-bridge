@@ -77,6 +77,7 @@ static inline struct net_hdtbl_entry* __hyfi_hdtbl_get(
 }
 
 extern int hyfi_hdtbl_init(void);
+extern void hyfi_hdtbl_free(void);
 extern void hyfi_hdtbl_fini(struct hyfi_net_bridge *br);
 extern void hyfi_hdtbl_flush(struct hyfi_net_bridge *br);
 extern void hyfi_hdtbl_cleanup(unsigned long arg);
