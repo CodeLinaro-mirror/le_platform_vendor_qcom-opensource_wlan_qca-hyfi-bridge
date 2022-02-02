@@ -743,13 +743,9 @@ struct net_bridge_port *hyfi_bridge_port_dev_get(struct net_device *dev,
 	const unsigned char *dest_addr, *src_addr;
 	struct net_hatbl_entry *ha;
 	struct net_bridge_port *port = NULL;
-	struct net_bridge_port *br_port = hyfi_br_port_get(dev);
 	struct hyfi_net_bridge * hyfi_br = NULL;
 
-	if (unlikely(!br_port))
-		return NULL;
-
-	hyfi_br = hyfi_bridge_get_by_port(br_port);
+	hyfi_br = hyfi_bridge_get_by_dev(dev);
 	if (unlikely(!hyfi_br))
 		return NULL;
 
