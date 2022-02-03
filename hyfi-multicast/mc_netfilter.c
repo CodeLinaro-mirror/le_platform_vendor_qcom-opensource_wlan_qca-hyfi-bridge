@@ -155,7 +155,7 @@ HYFI_MC_STATIC unsigned int mc_forward_hook(unsigned int hooknum, struct sk_buff
 
     /* Leave filter */
     if (mdb && MC_SKB_CB(skb)->type == MC_LEAVE && 
-            (atomic_read(&mdb->users) > 0))
+            (atomic_read(&mdb->users) > 1))
         goto drop;
 
     if (MC_SKB_CB(skb)->type != MC_LEAVE && 
