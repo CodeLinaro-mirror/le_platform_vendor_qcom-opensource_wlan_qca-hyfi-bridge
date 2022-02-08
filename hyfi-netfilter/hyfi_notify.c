@@ -163,8 +163,10 @@ void hyfi_br_notify(int group, int event, const void *ptr)
 			}
 
 			case RTM_DELLINK: {
+#ifndef DISABLE_APS_HOOKS
 				hyfi_hdtbl_delete_by_port(hf_br, p);
 				hyfi_hatbl_delete_by_port(hf_br, p);
+#endif
 				hyfi_bridge_delete_port(hf_br, p);
 
 				mc_nbp_change(hf_br, p, event);

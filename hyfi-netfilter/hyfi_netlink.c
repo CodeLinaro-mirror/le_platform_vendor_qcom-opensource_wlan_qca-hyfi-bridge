@@ -121,7 +121,10 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 	struct sk_buff *skb;
 	struct nlmsghdr *nlh = NULL;
 	void *hymsgdata = NULL;
-	u32 pid, seq, retval, msgtype;
+	u32 pid, seq, msgtype;
+#ifndef DISABLE_APS_HOOKS
+	u32 retval;
+#endif
 	struct __hyctl_msg_header *hymsghdr;
 	struct __hybr_info brinfo;
 	struct net_bridge_port *br_port = NULL;
@@ -227,7 +230,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 			}
 
 			switch (msgtype) {
-
+#ifndef DISABLE_APS_HOOKS
 			case HYFI_GET_HA_TABLE:
 				if (hyfi_hatbl_fillbuf(br, hymsgdata, hymsghdr->buf_len,
 						hymsghdr->tbl_offsite, &hymsghdr->bytes_written,
@@ -243,7 +246,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				}
 
 				break;
-
+#endif
 			case HYFI_GET_FDB: {
 				struct net_bridge *br = netdev_priv(brdev);
 
@@ -254,7 +257,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				}
 				break;
 			}
-
+#ifndef DISABLE_APS_HOOKS
 			case HYFI_ADD_HATBL_ENTRIES: {
 				int retval;
 				struct __hatbl_entry *p = hymsgdata;
@@ -383,7 +386,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 
 				break;
 			}
-
+#endif
 			case HYFI_SET_EVENT_PID: {
 				struct __event_info *p = hymsgdata;
 				spin_lock_bh(&br->lock);
@@ -426,11 +429,11 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				rcu_read_unlock();
 			}
 				break;
-
+#ifndef DISABLE_APS_HOOKS
 			case HYFI_FLUSH_HATBL:
 				hyfi_hatbl_flush(br);
 				break;
-
+#endif
 			case HYFI_SET_BRIDGE_MODE: {
 				u32 *p = hymsgdata;
 				if (!(*p == HYFI_BRIDGE_MODE_RELAY_OVERRIDE

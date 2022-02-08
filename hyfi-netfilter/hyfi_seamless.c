@@ -331,7 +331,9 @@ static int hyfi_psw_handle_pkt3(struct psw_pkt *psw_pkt,
 		struct hyfi_net_bridge *br)
 {
 	int32_t ret = -1;
+#ifndef DISABLE_APS_HOOKS
 	struct net_hatbl_entry *ha = NULL;
+#endif
 	u_int32_t hash, priority, sub_class;
 	u_int16_t mrk_id;
 	const unsigned char *da;
@@ -341,7 +343,7 @@ static int hyfi_psw_handle_pkt3(struct psw_pkt *psw_pkt,
 
 	if (ret < 0)
 		return 0;
-
+#ifndef DISABLE_APS_HOOKS
 	spin_lock(&br->hash_ha_lock);
 
 	ha = hyfi_hatbl_find_tracked_entry(br, hash, da, sub_class, priority);
@@ -391,6 +393,7 @@ static int hyfi_psw_handle_pkt3(struct psw_pkt *psw_pkt,
 	}
 
 	spin_unlock(&ha->psw_info.buf_q_lock);
+#endif
 	return 0;
 }
 
@@ -398,7 +401,9 @@ static int hyfi_psw_handle_pkt4(struct psw_pkt *psw_pkt,
 		struct hyfi_net_bridge *br, struct sk_buff *pskb)
 {
 	int32_t ret = -1;
+#ifndef DISABLE_APS_HOOKS
 	struct net_hatbl_entry *ha = NULL;
+#endif
 	u_int32_t hash, priority, sub_class;
 	u_int16_t mrk_id;
 	const unsigned char *da;
@@ -408,7 +413,7 @@ static int hyfi_psw_handle_pkt4(struct psw_pkt *psw_pkt,
 
 	if (ret < 0)
 		return 0;
-
+#ifndef DISABLE_APS_HOOKS
 	spin_lock(&br->hash_ha_lock);
 
 	ha = hyfi_hatbl_find_tracked_entry(br, hash, da, sub_class, priority);
@@ -452,6 +457,7 @@ static int hyfi_psw_handle_pkt4(struct psw_pkt *psw_pkt,
 	}
 
 	spin_unlock(&ha->psw_info.buf_q_lock);
+#endif
 	return 0;
 }
 

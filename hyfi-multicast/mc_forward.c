@@ -200,9 +200,9 @@ static void mc_flood_hook(__be32 ifindex, struct sk_buff *skb, int forward)
         kfree_skb(skb);
         goto out;
     }
-
+#ifndef DISABLE_APS_HOOKS
     hyfi_hatbl_update_mcast_stats(br_port->br, skb, br_port);
-
+#endif
     if (forward) {
         hyfi_br_forward(br_port, skb);
     }

@@ -411,7 +411,9 @@ void mc_group_notify_one(struct mc_struct *mc, struct mc_ip *pgroup)
     if (pgroup->pro == htons(ETH_P_IP))
     {
          hyfi_bridge_ipv4_mc_update_callback_t ipv4_mc_event_cb;
+#ifndef DISABLE_APS_HOOKS
          ipv4_mc_event_cb = hyfi_bridge_ipv4_mc_update_callback_get();
+#endif
          if (!ipv4_mc_event_cb)
              return;
 
@@ -422,7 +424,9 @@ void mc_group_notify_one(struct mc_struct *mc, struct mc_ip *pgroup)
     else
     {
         hyfi_bridge_ipv6_mc_update_callback_t ipv6_mc_event_cb;
+#ifndef DISABLE_APS_HOOKS
         ipv6_mc_event_cb = hyfi_bridge_ipv6_mc_update_callback_get();
+#endif
         if (!ipv6_mc_event_cb)
             return;
 

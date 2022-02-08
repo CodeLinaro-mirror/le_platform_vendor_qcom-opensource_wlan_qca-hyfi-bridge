@@ -415,6 +415,7 @@ static inline struct net_bridge_port *hyfi_bridge_handle_ha(struct net_hatbl_ent
 	return NULL;
 }
 
+#ifndef DISABLE_APS_HOOKS
 static inline struct net_bridge_port *hyfi_bridge_handle_hd(struct net_hdtbl_entry *hd,
 		struct sk_buff **skb, u_int32_t hash, u_int32_t traffic_class, u_int32_t priority)
 {
@@ -584,6 +585,7 @@ static struct net_bridge_port *hyfi_bridge_get_dst_port_no_hash(
 		}
 	}
 }
+#endif
 
 struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 		struct sk_buff **skb)
@@ -592,11 +594,13 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 	u_int32_t flag, priority;
 	u_int32_t hash;
 	u_int32_t traffic_class;
+#ifndef DISABLE_APS_HOOKS
 	struct net_hatbl_entry *ha = NULL;
 	struct net_hdtbl_entry *hd;
+	struct net_bridge_port *port;
+#endif
 	u_int16_t seq = ~0;
 	const struct net_bridge *br;
-	struct net_bridge_port *port;
 	struct hyfi_net_bridge *hyfi_br;
     const unsigned char *dest_addr, *src_addr;
     struct net_bridge_fdb_entry *dst, *hsrc;
@@ -650,7 +654,7 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 
 	traffic_class = (flag & IS_IPPROTO_UDP) ?
 			HYFI_TRAFFIC_CLASS_UDP : HYFI_TRAFFIC_CLASS_OTHER;
-
+#ifndef DISABLE_APS_HOOKS
 	/* If incoming packet is a TCP stream, make sure that the TCP-ACK
 	 * stream will be transmitted back on the same medium (if hyfi_tcp_sp
 	 * is enabled).
@@ -693,7 +697,7 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 	if (port) {
 		return port;
 	}
-
+#endif
 	if(unlikely(flag & (IS_HYFI_PKT | IS_HYFI_IP_PKT))) {
 		hyfi_psw_process_hyfi_pkt(hyfi_br, *skb, flag);
 
@@ -712,7 +716,7 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 		if(seq == (u_int16_t)~0) {
 			return NULL;
 		}
-
+#ifndef DISABLE_APS_HOOKS
 		ha = hyfi_hatbl_create_aggr_entry(hyfi_br, hash, eth_hdr(*skb)->h_source,
 				eth_hdr(*skb)->h_dest, traffic_class, priority, seq);
 
@@ -726,11 +730,12 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 		 * packet from the other side in the correct order.
 		 */
 		return hyfi_aggr_process_pkt(ha, skb, seq);
+#endif
 	}
 
 	return NULL;
 }
-
+#ifndef DISABLE_APS_HOOKS
 struct net_bridge_port *hyfi_bridge_port_dev_get(struct net_device *dev,
 	struct sk_buff *skb, unsigned char *addr, unsigned int ecm_serial)
 {
@@ -841,7 +846,7 @@ struct net_bridge_port *hyfi_bridge_port_dev_get(struct net_device *dev,
 	return hyfi_bridge_get_dst_port(hyfi_br, br, hash, traffic_class,
 		priority, skb, dest_addr, src_addr, NULL);
 }
-
+#endif
 int hyfi_bridge_should_deliver(const struct hyfi_net_bridge_port *src,
 		const struct hyfi_net_bridge_port *dst, const struct sk_buff *skb)
 {
@@ -879,21 +884,22 @@ static int hyfi_bridge_deinit_bridge_device(struct hyfi_net_bridge *hf_br)
 	mc_detach(hf_br);
 
 	hyfi_bridge_del_ports(hf_br);
-
+#ifndef DISABLE_APS_HOOKS
 	hyfi_hatbl_flush(hf_br);
 	hyfi_hdtbl_flush(hf_br);
-
+#endif
 	rcu_assign_pointer(hf_br->dev, NULL);
 
 	for (i = 0; i < HYFI_BRIDGE_MAX; i++) {
 		if (hyfi_bridges[i].dev != NULL)
 			del_hooks = 0;
 	}
+#ifndef DISABLE_APS_HOOKS
 	if (del_hooks) {
 		rcu_assign_pointer(br_get_dst_hook, NULL);
 		rcu_assign_pointer(br_port_dev_get_hook, NULL);
 	}
-
+#endif
 	/*
 	 * Note: Can't put the device until RCU is synchronized, which can't
 	 * be done under lock.
@@ -929,13 +935,13 @@ static int hyfi_bridge_init_bridge_device(struct hyfi_net_bridge *hyfi_br, const
 	/* Init ports */
 	hyfi_bridge_ports_init(hyfi_br, br_dev);
 	rcu_assign_pointer(hyfi_br->dev, br_dev);
-
+#ifndef DISABLE_APS_HOOKS
 	/* see br_input.c */
 	rcu_assign_pointer(br_get_dst_hook, hyfi_bridge_get_dst);
 
 	/* see br_if.c */
 	rcu_assign_pointer(br_port_dev_get_hook, hyfi_bridge_port_dev_get);
-
+#endif
 	/* Multicast module attach to the bridge */
 	if (mc_attach(hyfi_br)<0)
 		return -1;
@@ -950,22 +956,23 @@ int __init hyfi_bridge_init(void)
 	int i;
 	memset(&hyfi_bridges, 0, sizeof(hyfi_bridges));
 	strlcpy(hyfi_bridges[0].linux_bridge, hyfi_linux_bridge, IFNAMSIZ );
+#ifndef DISABLE_APS_HOOKS
 	hyfi_hatbl_init();
 	if (hyfi_hdtbl_init()) {
 		hyfi_hatbl_free();
 		return -1;
 	}
-
+#endif
 	for (i = 0; i < HYFI_BRIDGE_MAX; i++) {
 		spin_lock_init(&hyfi_bridges[i].lock);
 
 		hyfi_bridges[i].event_pid = NLEVENT_INVALID_PID;
 		INIT_LIST_HEAD(&hyfi_bridges[i].port_list);
-
+#ifndef DISABLE_APS_HOOKS
 		/* Init tables */
 		if (hyfi_hatbl_setup(&hyfi_bridges[i]))
 			return -1;
-
+#endif
 		/* Init seamless path switching */
 		hyfi_psw_init(&hyfi_bridges[i]);
 	}
@@ -979,12 +986,13 @@ void __exit hyfi_bridge_fini(void)
 
 	for (i = 0; i < HYFI_BRIDGE_MAX; i++) {
 		hyfi_bridge_set_bridge_name(&hyfi_bridges[i], NULL);
-
+#ifndef DISABLE_APS_HOOKS
 		hyfi_hatbl_fini(&hyfi_bridges[i]);
 		hyfi_hdtbl_fini(&hyfi_bridges[i]);
+#endif
 	}
-
+#ifndef DISABLE_APS_HOOKS
 	hyfi_hatbl_free();
 	hyfi_hdtbl_free();
-
+#endif
 }

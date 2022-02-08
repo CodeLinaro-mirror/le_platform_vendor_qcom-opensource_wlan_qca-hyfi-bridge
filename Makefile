@@ -70,22 +70,28 @@ $(TARGET)-objs := \
 	$(HYFI_NF)/hyfi_main.o \
 	$(HYFI_NF)/hyfi_bridge.o \
 	$(HYFI_NF)/hyfi_netfilter.o \
-	$(HYFI_NF)/hyfi_hatbl.o \
-	$(HYFI_NF)/hyfi_hdtbl.o \
 	$(HYFI_NF)/hyfi_netlink.o \
 	$(HYFI_NF)/hyfi_fdb.o \
 	$(HYFI_NF)/hyfi_notify.o \
 	$(HYFI_NF)/hyfi_seamless.o \
-	$(HYFI_NF)/hyfi_aggr.o \
-	$(HYFI_NF)/hyfi_ecm.o \
 	$(HYFI_MC)/mc_main.o \
 	$(HYFI_MC)/mc_netlink.o \
 	$(HYFI_MC)/mc_netfilter.o \
 	$(HYFI_MC)/mc_snooping.o \
-	$(HYFI_MC)/mc_forward.o \
-	$(HYFI_MC)/mc_ecm.o
+	$(HYFI_MC)/mc_forward.o
 
-else 
+ifneq ($(CONFIG_BUILD_YOCTO),y)
+$(TARGET)-objs += \
+	$(HYFI_NF)/hyfi_hatbl.o \
+	$(HYFI_NF)/hyfi_hdtbl.o \
+	$(HYFI_NF)/hyfi_aggr.o \
+	$(HYFI_NF)/hyfi_ecm.o \
+	$(HYFI_MC)/mc_ecm.o
+else
+ccflags-y+=-DDISABLE_APS_HOOKS
+endif
+
+else
 
 # Makefile targets - part 1
 
