@@ -89,6 +89,7 @@ $(TARGET)-objs += \
 	$(HYFI_MC)/mc_ecm.o
 else
 ccflags-y+=-DDISABLE_APS_HOOKS
+ccflags-y+=-DBUILD_YOCTO
 endif
 
 else

@@ -531,7 +531,11 @@ static void __mc_netlink_receive(struct sk_buff *__skb)
     struct mc_struct *mc = NULL;
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0))
+#ifndef BUILD_YOCTO
     if ((skb = skb_clone(__skb, GFP_KERNEL)) == NULL)
+#else
+    if ((skb = skb_clone(__skb, GFP_ATOMIC)) == NULL)
+#endif
 #else
     if ((skb = skb_get(__skb)) == NULL)
 #endif
