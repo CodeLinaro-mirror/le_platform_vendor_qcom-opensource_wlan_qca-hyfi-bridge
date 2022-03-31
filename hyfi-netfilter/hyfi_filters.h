@@ -80,6 +80,24 @@ static inline int hyfi_is_lldp_pkt(struct sk_buff *skb)
 	return 0;
 }
 
+/*
+ * IEEE 1905.1 message types
+ */
+typedef enum ieee1905MessageType_e {
+	IEEE1905_MSG_TYPE_TOPOLOGY_DISCOVERY = 0,
+	IEEE1905_MSG_TYPE_TOPOLOGY_NOTIFICATION,
+	IEEE1905_MSG_TYPE_TOPOLOGY_QUERY,
+	IEEE1905_MSG_TYPE_TOPOLOGY_RESPONSE,
+	IEEE1905_MSG_TYPE_VENDOR_SPECIFIC,
+	IEEE1905_MSG_TYPE_LINK_METRIC_QUERY,
+	IEEE1905_MSG_TYPE_LINK_METRIC_RESPONSE,
+	IEEE1905_MSG_TYPE_AP_AUTOCONFIGURATION_SEARCH,
+	IEEE1905_MSG_TYPE_AP_AUTOCONFIGURATION_RESPONSE,
+	IEEE1905_MSG_TYPE_AP_AUTOCONFIGURATION_WPS,
+	IEEE1905_MSG_TYPE_AP_AUTOCONFIGURATION_RENEW
+} ieee1905MessageType_e;
+
+static inline int hyfi_ieee1905_msg_type(struct sk_buff *skb);
 static inline int hyfi_ieee1905_frame_filter(struct sk_buff *skb,
 		const struct net_device *dev)
 {
@@ -88,13 +106,26 @@ static inline int hyfi_ieee1905_frame_filter(struct sk_buff *skb,
 		u8 ifindex = (u8) (dev->ifindex);
 		u8 flags, index_quot;
 
+		if (!(hyfi_ieee1905_msg_type(skb) == IEEE1905_MSG_TYPE_TOPOLOGY_DISCOVERY ||
+			hyfi_ieee1905_msg_type(skb) == IEEE1905_MSG_TYPE_TOPOLOGY_NOTIFICATION ||
+			hyfi_ieee1905_msg_type(skb) == IEEE1905_MSG_TYPE_TOPOLOGY_QUERY ||
+			hyfi_ieee1905_msg_type(skb) == IEEE1905_MSG_TYPE_TOPOLOGY_RESPONSE ||
+			hyfi_ieee1905_msg_type(skb) == IEEE1905_MSG_TYPE_VENDOR_SPECIFIC ||
+			hyfi_ieee1905_msg_type(skb) ==
+			IEEE1905_MSG_TYPE_AP_AUTOCONFIGURATION_SEARCH ||
+			hyfi_ieee1905_msg_type(skb) ==
+			IEEE1905_MSG_TYPE_AP_AUTOCONFIGURATION_RENEW)) {
+			return 1;
+		}
+
 		flags = *((u8 *) (data + sizeof(struct ethhdr) + 7));
 		flags = flags & 0xc0;
 
-		index_quot = dev->ifindex / 256;
+		index_quot = dev->ifindex >> 8;
 		if (index_quot < 64) {
 			flags = flags | index_quot;
 		}
+
 		put_unaligned(ifindex,
 			(u8 *) (data + sizeof(struct ethhdr) + 1));
 		put_unaligned(flags,

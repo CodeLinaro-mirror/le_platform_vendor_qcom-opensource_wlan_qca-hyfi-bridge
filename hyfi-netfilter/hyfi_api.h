@@ -93,6 +93,7 @@ enum {
 	HYFI_SET_BRIDGE_TS_MODE,  /* traffic separation enabled */
 	HYFI_VERSION_COMPATIBILITY_CHECK,   /* Version compatibility check */
 	HYFI_GET_WDS_EXT_IFACE_LIST,   /* wds_ext iface list used in 4address conversion */
+	HYFI_SET_BRIDGE_AP_OP_MODE,  /* check if ctrl or agent enabled */
 
 	HYFI_GET_PORT_LIST = 0x100,
 	HYFI_SET_BRPORT_GROUP, /* port group number and type */

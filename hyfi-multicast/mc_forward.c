@@ -33,7 +33,7 @@ static void mc_retag(void *iph, __be16 etype, __be32 dscp)
 
     if (etype == ETH_P_IP) {
         ipv4_copy_dscp(_dscp, iph);
-    } 
+    }
 #ifdef HYBRID_MC_MLD
     else if (etype == ETH_P_IPV6) {
         ipv6_copy_dscp(_dscp, iph);
@@ -81,12 +81,12 @@ static int mc_encap_filter_source(struct __mc_encaptbl_dev *dev, void *ip, __be1
     }
     if (n == dev->ex_nsrcs)
         return 0;
- 
+
     return 1;
 }
 
-static void mc_encap_hook(struct net_bridge *br, 
-        struct __mc_encaptbl_dev *encap_dev, 
+static void mc_encap_hook(struct net_bridge *br,
+        struct __mc_encaptbl_dev *encap_dev,
         struct sk_buff *skb, int forward)
 {
     struct net_bridge_port *pdst = NULL;
@@ -121,7 +121,7 @@ static void mc_encap_hook(struct net_bridge *br,
             br_deliver(pdst, skb);
 #endif
     }
-out: 
+out:
     if (skb && !pdst)
         kfree_skb(skb);
 }
@@ -140,7 +140,7 @@ static int mc_do_encap(struct mc_mdb_entry *mdb, void *iph, struct sk_buff *skb,
 
     if (mc->debug && printk_ratelimit()) {
         if (mdb->group.pro == htons(ETH_P_IP)) {
-            MC_PRINT("Encap the Group "MC_IP4_STR" to following QCA devices:\n", 
+            MC_PRINT("Encap the Group "MC_IP4_STR" to following QCA devices:\n",
                     MC_IP4_FMT((u8 *)(&mdb->group)));
         } else {
             MC_PRINT("Encap the Group "MC_IP6_STR" to following QCA devices:\n",
@@ -189,7 +189,7 @@ static void mc_flood_hook(__be32 ifindex, struct sk_buff *skb, int forward)
 {
     struct net_device *dev;
     struct net_bridge_port *br_port;
- 
+
     if (!(dev = dev_get_by_index(&init_net, ifindex))) {
         kfree_skb(skb);
         return;
@@ -267,7 +267,7 @@ static int mc_do_flood(struct mc_mdb_entry *mdb, struct sk_buff *skb, int forwar
 
     if (unlikely(mc->debug && printk_ratelimit())) {
         if (mdb->group.pro == htons(ETH_P_IP)) {
-            MC_PRINT("Flood the Group "MC_IP4_STR" to following interfaces:\n", 
+            MC_PRINT("Flood the Group "MC_IP4_STR" to following interfaces:\n",
                     MC_IP4_FMT((u8 *)(&mdb->group)));
         } else {
             MC_PRINT("Flood the Group "MC_IP6_STR" to following interfaces:\n",
@@ -298,7 +298,7 @@ static int mc_do_flood(struct mc_mdb_entry *mdb, struct sk_buff *skb, int forwar
         }
         prev = mdb->flood_ifindex[i];
     }
-    if (prev) 
+    if (prev)
         mc_flood_hook(prev, skb, forward);
     else
         kfree_skb(skb);
@@ -323,6 +323,7 @@ static int mc_convert(struct mc_struct *mc, struct sk_buff *skb, int forward)
     struct hlist_head *rhead = NULL;
     int is_management;
     int passup = 0;
+    struct hyfi_net_bridge *hyfi_br;
 
     eh = eth_hdr(skb);
     etype = ntohs(eh->h_proto);
@@ -341,7 +342,7 @@ static int mc_convert(struct mc_struct *mc, struct sk_buff *skb, int forward)
             if (!mc->convert_all && ip->protocol != IPPROTO_UDP)
                 goto out;
 
-            is_management = mc_find_acl_rule(&mc->igmp_acl, ip->daddr, NULL, 
+            is_management = mc_find_acl_rule(&mc->igmp_acl, ip->daddr, NULL,
                     eh->h_dest, MC_ACL_RULE_MANAGEMENT);
 
             memset(&group, 0, sizeof group);
@@ -372,31 +373,34 @@ static int mc_convert(struct mc_struct *mc, struct sk_buff *skb, int forward)
             break;
 #endif
         default:
-            if (hyfi_is_ieee1905_pkt(skb)) {
-                struct net_bridge_fdb_entry *hsrc;
-                struct sk_buff *skb2;
-                unsigned char *dest_addr, *src_addr;
-                struct hyfi_net_bridge *hyfi_br;
-                const struct net_bridge *br;
+            hyfi_br = hyfi_bridge_get_by_dev(mc->dev);
+            if (hyfi_br) {
+                if (hyfi_br->isController && hyfi_is_ieee1905_pkt(skb)) {
+                    struct net_bridge_fdb_entry *hsrc;
+                    struct sk_buff *skb2;
+                    unsigned char *dest_addr, *src_addr;
+                    struct hyfi_net_bridge *hyfi_br;
+                    const struct net_bridge *br;
+                    src_addr = eth_hdr(skb)->h_source;
+                    dest_addr = eth_hdr(skb)->h_dest;
+                    br = netdev_priv(BR_INPUT_SKB_CB(skb)->brdev);
+                    hyfi_br = hyfi_bridge_get(br);
 
-                src_addr = eth_hdr(skb)->h_source;
-                dest_addr = eth_hdr(skb)->h_dest;
-                br = netdev_priv(BR_INPUT_SKB_CB(skb)->brdev);
-                hyfi_br = hyfi_bridge_get(br);
+                    if (unlikely(!br || !hyfi_br || !hyfi_br->dev || br->dev != hyfi_br->dev)) {
+                        goto out;
+                    }
 
-                if (unlikely(!br || !hyfi_br || !hyfi_br->dev || br->dev != hyfi_br->dev)) {
-                    goto out;
-                }
-
-                if ((hsrc = os_br_fdb_get((struct net_bridge *) br, eth_hdr(skb)->h_source)) && hsrc->is_local) {
-                    hyfi_ieee1905_frame_filter(skb, skb->dev);
-                    skb2 = skb_clone(skb, GFP_ATOMIC);
-                    if (skb2) {
-                        skb2->dev = hyfi_br->dev;
-                        netif_receive_skb(skb2);
-                        if (hyfi_ieee1905_msg_type(skb) == 0) {
-                            kfree_skb(skb);
-                            return 0;
+                    if ((hsrc = os_br_fdb_get((struct net_bridge *)br, eth_hdr(skb)->h_source)) &&
+                        hsrc->is_local) {
+                        hyfi_ieee1905_frame_filter(skb, skb->dev);
+                        skb2 = skb_clone(skb, GFP_ATOMIC);
+                        if (skb2) {
+                            skb2->dev = hyfi_br->dev;
+                            netif_receive_skb(skb2);
+                            if (hyfi_ieee1905_msg_type(skb) == 0) {
+                                kfree_skb(skb);
+                                return 0;
+                            }
                         }
                     }
                 }
@@ -440,7 +444,7 @@ static int mc_convert(struct mc_struct *mc, struct sk_buff *skb, int forward)
         mc_retag(iph, etype, mc->dscp);
 
     if (mdb->flood_ifcnt) {
-        if (!(skb2 = skb_clone(skb, GFP_ATOMIC)) || 
+        if (!(skb2 = skb_clone(skb, GFP_ATOMIC)) ||
                 (mc_do_flood(mdb, skb2, forward) < 0)) {
             kfree_skb(skb);
             return 0;
@@ -487,7 +491,7 @@ static int __mc_process(const struct net_bridge_port *src, struct sk_buff *skb)
 
     mc = MC_DEV(hyfi_br);
 
-    if (!mc || !mc->started || 
+    if (!mc || !mc->started ||
             is_broadcast_ether_addr(eth_hdr(skb)->h_dest))
         return -EINVAL;
 
@@ -503,7 +507,7 @@ static int __mc_process(const struct net_bridge_port *src, struct sk_buff *skb)
         kfree_skb(skb);
         return 0;
     }
-    
+
     return mc_convert(mc, skb, 1);
 }
 
@@ -528,7 +532,7 @@ int mc_forward_init(void)
     br_multicast_handle_hook_t *br_mc_handler = rcu_dereference(br_multicast_handle_hook);
 
     if ( (br_mc_handler != mc_process) && (br_mc_handler != NULL) ) {
-        printk("%s: br_multicast_hook is being used by another module. HyFi-multicast-bridge module will not work.\n",__func__); 
+        printk("%s: br_multicast_hook is being used by another module. HyFi-multicast-bridge module will not work.\n",__func__);
         return -1;
     }
     rcu_assign_pointer(br_multicast_handle_hook, mc_process);
@@ -539,4 +543,3 @@ void mc_forward_exit(void)
 {
     rcu_assign_pointer(br_multicast_handle_hook, NULL);
 }
-

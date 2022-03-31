@@ -610,6 +610,16 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				spin_unlock_bh( &br->lock);
 				break;
 			}
+			case HYFI_SET_BRIDGE_AP_OP_MODE: {
+				u32 *p = hymsgdata;
+				spin_lock_bh(&br->lock);
+				if (*p == 1)
+					br->isController = 1;
+				else
+					br->isController = 0;
+				spin_unlock_bh( &br->lock);
+				break;
+			}
 			case HYFI_SET_SP_RULE:{
 
 #ifdef HYFI_BRIDGE_EMESH_ENABLE

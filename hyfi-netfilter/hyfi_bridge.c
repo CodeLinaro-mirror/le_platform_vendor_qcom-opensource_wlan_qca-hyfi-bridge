@@ -623,9 +623,9 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 	u_int16_t seq = ~0;
 	const struct net_bridge *br;
 	struct hyfi_net_bridge *hyfi_br;
-    const unsigned char *dest_addr, *src_addr;
-    struct net_bridge_fdb_entry *dst, *hsrc;
-    struct sk_buff *skb2;
+	const unsigned char *dest_addr, *src_addr;
+	struct net_bridge_fdb_entry *dst, *hsrc;
+	struct sk_buff *skb2;
 
 	if (src) {
 		/* Bridged interface */
@@ -640,38 +640,42 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 	if (unlikely(!br || !hyfi_br || !hyfi_br->dev || br->dev != hyfi_br->dev))
 		return NULL;
 
-    if (hyfi_is_ieee1905_pkt(*skb)) { // Need to check for 1905 and src interface to be self
-/*
-        Modify the SKB to be received by the other hyd instance
-        1. From dest mac derive FDB
-        2. From FDB, check local or noa
-        3. Retrieve the dev from FDB
-        4. Modify skb dev with the retrieved interface dev
-        5. Call netif_rx_skb with the modified skb
-*/
-        src_addr = eth_hdr(*skb)->h_source;
-        dest_addr = eth_hdr(*skb)->h_dest;
-        if ((dst = os_br_fdb_get((struct net_bridge *) br, eth_hdr(*skb)->h_dest)) && dst->is_local) {
-            if ((hsrc = os_br_fdb_get((struct net_bridge *) br, eth_hdr(*skb)->h_source)) && hsrc->is_local) {
-                hyfi_ieee1905_frame_filter(*skb, (*skb)->dev);
-                skb2 = skb_clone(*skb, GFP_ATOMIC);
-                if (skb2) {
-                    skb2->dev = hyfi_br->dev;
-                    netif_receive_skb(skb2);
-                }
-                return NULL;
-            }
-        }
-    }
+	if (hyfi_br->isController) {
+		if (hyfi_is_ieee1905_pkt(*skb)) {
+			/* Need to check for 1905 and src interface to be self
+			Modify the SKB to be received by the other hyd instance
+			1. From dest mac derive FDB
+			2. From FDB, check local or noa
+			3. Retrieve the dev from FDB
+			4. Modify skb dev with the retrieved interface dev
+			5. Call netif_rx_skb with the modified skb
+			*/
+			src_addr = eth_hdr(*skb)->h_source;
+			dest_addr = eth_hdr(*skb)->h_dest;
+			if ((dst = os_br_fdb_get((struct net_bridge *)br, eth_hdr(*skb)->h_dest)) &&
+				dst->is_local) {
+				if ((hsrc = os_br_fdb_get((struct net_bridge *)br, eth_hdr(*skb)->h_source)) &&
+					hsrc->is_local) {
+					hyfi_ieee1905_frame_filter(*skb, (*skb)->dev);
+					skb2 = skb_clone(*skb, GFP_ATOMIC);
+					if (skb2) {
+						skb2->dev = hyfi_br->dev;
+						netif_receive_skb(skb2);
+					}
+					return NULL;
+				}
+			}
+		}
+	}
 
-    /* If not operating in APS mode, no hybrid tables are consulted. */
-    if (unlikely(!hyfi_bridge_is_fwmode_aps(hyfi_br))) {
-        return NULL;
-    }
+	/* If not operating in APS mode, no hybrid tables are consulted. */
+	if (unlikely(!hyfi_bridge_is_fwmode_aps(hyfi_br))) {
+		return NULL;
+	}
 
-    if (unlikely(hyfi_hash_skbuf(*skb, &hash, &flag, &priority, &seq))) {
-        return NULL;
-    }
+	if (unlikely(hyfi_hash_skbuf(*skb, &hash, &flag, &priority, &seq))) {
+		return NULL;
+	}
 
 	traffic_class = (flag & IS_IPPROTO_UDP) ?
 			HYFI_TRAFFIC_CLASS_UDP : HYFI_TRAFFIC_CLASS_OTHER;
