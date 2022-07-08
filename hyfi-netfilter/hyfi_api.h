@@ -125,6 +125,7 @@ enum {
 
 	HYFI_SET_SP_RULE = 0x700, /* Service priortization rule */
 	HYFI_FLUSH_SP_RULES,
+	HYFI_SET_MSCS_RULE,
 };
 
 /* Bridge mode:
@@ -331,6 +332,7 @@ struct __hatbl_entry {
 struct __path_switch_param {
 	u_int32_t enable_switch_markers;
 };
+
 struct __sp_rule {
 	/// service prioritization rule identifier.
 	u_int32_t id;
@@ -446,6 +448,33 @@ struct __sp_rule {
 	uint32_t burst_size_dl;
 	/// Burst size uplink
 	uint32_t burst_size_ul;
+};
+
+struct __mscs_rule {
+	/// service prioritization rule identifier.
+	u_int32_t id;
+	/// add-remove filter rule bit.
+	/// 1 means add 0 means delete
+	u_int8_t add_delete_rule ;
+	/// rule precedence – higher number means higher priority.
+	u_int8_t rule_precedence;
+	/// rule output the value of or method  used to select the 802.1q c-tag
+	/// pcp value with which  to mark the matched packet.
+	u_int8_t rule_output;
+	/// match source mac address flag
+	u_int8_t match_source_mac ;
+	/// match destination mac address flags
+	u_int8_t match_dst_mac ;
+	/// source mac address
+	/// If “Match Source IPv6 Address” flag bit is set to one,
+	/// this field shall be included, otherwise this field shall be omitted.
+	u_int8_t sa[6];
+	/// destination mac address
+	/// if “match destination mac address” flag bit is set to one,
+	/// this field shall be included, otherwise this field shall be omitted.
+	u_int8_t da[6];
+	/// MSCS TID bitmap
+	u_int8_t mscs_tid_bitmap;
 };
 
 #endif

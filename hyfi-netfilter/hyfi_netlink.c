@@ -795,7 +795,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 					to_emesh_sp.inner.burst_size_ul = msg_value->burst_size_ul;
 					DEBUG_INFO("burst_size_ul = 0x%x \n", msg_value->burst_size_ul);
 				}
-
+				to_emesh_sp.classifier_type = SP_RULE_TYPE_MESH;
 				sp_mapdb_rule_update(&to_emesh_sp);
 #endif
 
@@ -806,6 +806,72 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 #ifdef HYFI_BRIDGE_EMESH_ENABLE
 				DEBUG_INFO(" \n *** Recieved Flush SP rule. *** \n");
 				sp_mapdb_ruletable_flush();
+#endif
+
+				break;
+			}
+			case HYFI_SET_MSCS_RULE:{
+
+#ifdef HYFI_BRIDGE_EMESH_ENABLE
+				// Todo: Enable after emesh-s check in
+				#if 0
+				struct __mscs_rule *msg_value = (struct __mscs_rule *)hymsgdata;
+				struct sp_rule to_emesh_sp = {0};
+				int i = 0;
+
+				DEBUG_INFO(" \n *** Recieved MSCS rule *** \n");
+
+				to_emesh_sp.id = msg_value->id;
+				DEBUG_INFO("Rule id:  %08x \n", msg_value->id);
+
+				if (msg_value->add_delete_rule == 0)
+				{
+						to_emesh_sp.cmd = SP_MAPDB_ADD_REMOVE_FILTER_DELETE;
+						DEBUG_INFO("Deleting rule \n");
+				}
+				else if (msg_value->add_delete_rule == 1)
+				{
+						to_emesh_sp.cmd = SP_MAPDB_ADD_REMOVE_FILTER_ADD;
+						DEBUG_INFO("Adding rule \n");
+				}
+				else
+				{
+						DEBUG_INFO(" \nInvalid add/delete rule %d \n", msg_value->add_delete_rule);
+						break;
+				}
+
+				to_emesh_sp.rule_precedence = msg_value->rule_precedence;
+				DEBUG_INFO("Rule Precedence = 0x%x \n", to_emesh_sp.rule_precedence);
+
+				to_emesh_sp.inner.rule_output = msg_value->rule_output;
+				DEBUG_INFO("Rule Output = 0x%x \n", to_emesh_sp.inner.rule_output);
+
+				if (msg_value->match_source_mac)
+						to_emesh_sp.inner.flags |= SP_RULE_FLAG_MATCH_SOURCE_MAC;
+				DEBUG_INFO("match_source_mac = 0x%x \n", msg_value->match_source_mac);
+
+				if (msg_value->match_dst_mac)
+						to_emesh_sp.inner.flags |= SP_RULE_FLAG_MATCH_DST_MAC;
+				DEBUG_INFO("match_dst_mac = 0x%x \n", msg_value->match_dst_mac);
+
+				for (i = 0; i < ETH_ALEN; i++)
+				{
+						to_emesh_sp.inner.sa[i] = msg_value->sa[i];
+						to_emesh_sp.inner.da[i] = msg_value->da[i];
+				}
+
+				DEBUG_INFO("sa = %02x:%02x:%02x:%02x:%02x:%02x \n", msg_value->sa[0], msg_value->sa[1],
+									msg_value->sa[2], msg_value->sa[3],
+									msg_value->sa[4], msg_value->sa[5]);
+				DEBUG_INFO("da = %02x:%02x:%02x:%02x:%02x:%02x \n", msg_value->da[0], msg_value->da[1],
+									msg_value->da[2], msg_value->da[3],
+									msg_value->da[4], msg_value->da[5]);
+
+				to_emesh_sp.inner.mscs_tid_bitmap = msg_value->mscs_tid_bitmap;
+				DEBUG_INFO("MSCS tid bitmap = 0x%x \n", to_emesh_sp.inner.mscs_tid_bitmap);
+				to_emesh_sp.classifier_type = SP_RULE_TYPE_MSCS;
+				sp_mapdb_rule_update(&to_emesh_sp);
+				#endif
 #endif
 
 				break;
