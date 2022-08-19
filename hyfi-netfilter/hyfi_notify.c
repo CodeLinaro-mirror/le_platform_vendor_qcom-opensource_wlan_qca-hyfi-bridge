@@ -79,6 +79,64 @@ static int hyfi_device_link_event(struct notifier_block *unused, unsigned long e
 	return NOTIFY_DONE;
 }
 #endif
+
+
+/*
+ * @brief send interface bridge_join/leave event to application
+ *
+ * @param event [in] - type of event BR_JOIN/BR_LEAVE
+ * @param ptr   [in] - data pointer which includes net_dev of wds_ext iface
+ * @param hyfi_bridge [in] - bridge on which wds_ext iface is added or removed
+ *
+ */
+static void hyfi_wdsExt_device_event(unsigned long event,
+        void *ptr, struct hyfi_net_bridge *hyfi_bridge)
+{
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0))
+    struct net_device *dev = netdev_notifier_info_to_dev(ptr);
+#else
+    struct net_device *dev = ptr;
+#endif
+    u_int32_t device_event;
+    u_int32_t sys_index = 0;
+    char buf[256] = {0};
+    struct hyfi_net_bridge *hyfi_br;
+
+    /* Application will take care of handling invalid bridge sys index */
+    if (hyfi_bridge)
+        sys_index = hyfi_bridge->dev->ifindex;
+
+    /*NL event is registered only with primary bridge so, send event with primary bridge*/
+    hyfi_br = hyfi_bridge_get_first_br();
+
+    if (!hyfi_br || hyfi_br->event_pid == NLEVENT_INVALID_PID) {
+        DEBUG_ERROR("%s: Invalid event PID. wds_ext iface event failed\n", __func__);
+        return;
+    }
+
+    switch (event) {
+        case NETDEV_BR_JOIN:
+        case NETDEV_BR_LEAVE:
+            DEBUG_INFO("%s: iface %s %s %s:%d\n",__func__, dev->name,
+                    (event == NETDEV_BR_JOIN ? "JOINED" : "LEAVED"),
+                    hyfi_br->dev->name, sys_index);
+
+            device_event = (event == NETDEV_BR_JOIN) ?
+                HYFI_EVENT_BR_JOIN : HYFI_EVENT_BR_LEAVE;
+            memcpy(buf, dev->name, IFNAMSIZ);
+            memcpy((char *)(&buf[0] + IFNAMSIZ), (char *)(&sys_index), sizeof(u_int32_t));
+
+            /* Send a link change notification */
+            hyfi_netlink_event_send(hyfi_br, device_event, IFNAMSIZ+sizeof(u_int32_t), buf);
+            break;
+
+        default:
+            return;
+    }
+
+    return;
+}
+
 /*
  * Handle changes in state of network devices enslaved to a bridge.
  */
@@ -94,6 +152,12 @@ static int hyfi_device_event(struct notifier_block *unused, unsigned long event,
 	struct net_bridge *br;
 	struct hyfi_net_bridge *hyfi_br = hyfi_bridge_get_by_dev(dev);
 	u_int32_t device_event;
+
+	if (strstr(dev->name, ".sta") != NULL) {
+		/* port is NULL during BR_JOIN & it is not required for wdsExt event.
+		 so using separate function for wdsExt event */
+		hyfi_wdsExt_device_event(event, ptr, hyfi_br);
+	}
 
 	if (!hyfi_br)
 		return NOTIFY_DONE;

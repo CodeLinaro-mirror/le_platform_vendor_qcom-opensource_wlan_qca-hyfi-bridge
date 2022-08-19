@@ -269,6 +269,22 @@ static void hyfi_destroy_port_rcu(struct rcu_head *head)
 	kfree(hyfi_p);
 }
 
+int hyfi_bridge_get_WdsExt_iface_list(struct hyfi_net_bridge *hyfi_br, struct WdsExt_iflist *wdsExtlist)
+{
+	struct hyfi_net_bridge_port *hyfi_p;
+	int i=0;
+
+	list_for_each_entry_rcu(hyfi_p, &hyfi_br->port_list, list) {
+		if( strstr(hyfi_p->dev->name, ".sta") != NULL ) {
+			memcpy(wdsExtlist->iflist[i].ifname, hyfi_p->dev->name, IFNAMSIZ);
+			i++;
+			wdsExtlist->num_entries=i;
+		}
+	}
+
+	return 0;
+}
+
 int hyfi_bridge_delete_port(struct hyfi_net_bridge *hyfi_br, struct net_bridge_port *p)
 {
 	struct hyfi_net_bridge_port *hyfi_p;
@@ -339,6 +355,11 @@ static int hyfi_bridge_ports_init(struct hyfi_net_bridge *hyfi_br, struct net_de
 	read_unlock(&dev_base_lock);
 
 	return 0;
+}
+
+struct hyfi_net_bridge *hyfi_bridge_get_first_br(void)
+{
+	return &hyfi_bridges[0];
 }
 
 struct hyfi_net_bridge *hyfi_bridge_get(const struct net_bridge *br)

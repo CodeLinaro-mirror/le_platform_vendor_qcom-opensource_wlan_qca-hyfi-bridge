@@ -112,7 +112,6 @@ static int hyfi_mesh_version_compatibility_check(char *ver_str)
 	return ret;
 }
 
-
 static void hyfi_netlink_receive(struct sk_buff *__skb)
 {
 	struct net_device *brdev = NULL;
@@ -897,6 +896,25 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				break;
 			};
 
+			case HYFI_GET_WDS_EXT_IFACE_LIST:
+			{
+				int ret = -1;
+				struct WdsExt_iflist *data = hymsgdata;
+
+				DEBUG_INFO(" \n *** Recieved WdsExt iface list request ***\n");
+				hymsghdr->buf_len = sizeof(struct WdsExt_iflist);
+				ret = hyfi_bridge_get_WdsExt_iface_list(br, data);
+				DEBUG_INFO("%s: numOfWdsExt entry:%d \n", __func__, data->num_entries);
+
+				/* assign return status */
+				if ( ret == 0 ) {
+					hymsghdr->status = HYFI_STATUS_SUCCESS;
+				} else {
+					hymsghdr->status = HYFI_STATUS_FAILURE;
+				}
+				break;
+			};
+
 			default:
 				DEBUG_WARN("hyfi: Unknown message type 0x%x\n", msgtype);
 				hymsghdr->status = HYFI_STATUS_INVALID_PARAMETER;
@@ -938,6 +956,7 @@ void hyfi_netlink_event_send(struct hyfi_net_bridge *br,
 	struct __hatbl_entry *hae;
 	struct net_hatbl_entry *ha;
 	struct net_bridge_port *bp;
+	char *data;
 
 	if (!br || br->event_pid == NLEVENT_INVALID_PID) {
 		return;
@@ -995,6 +1014,12 @@ void hyfi_netlink_event_send(struct hyfi_net_bridge *br,
 		bp = event_data;
 		*(u32*) NLMSG_DATA( nlh ) = bp->dev->ifindex;
 
+		break;
+
+	case HYFI_EVENT_BR_JOIN:
+	case HYFI_EVENT_BR_LEAVE:
+		data = (char *) NLMSG_DATA( nlh );
+		memcpy(data, (char *) event_data, IFNAMSIZ + sizeof(u_int32_t)); /* interface name + bridge sys index */
 		break;
 
 	case HYFI_EVENT_FDB_UPDATED:

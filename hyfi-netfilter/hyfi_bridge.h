@@ -71,6 +71,7 @@ struct hyfi_net_bridge_port {
 };
 
 struct hyfi_net_bridge *hyfi_bridge_get(const struct net_bridge *br);
+struct hyfi_net_bridge *hyfi_bridge_get_first_br(void);
 struct hyfi_net_bridge *hyfi_bridge_get_by_dev(const struct net_device *dev);
 struct hyfi_net_bridge *hyfi_bridge_get_by_port(const struct net_bridge_port *port);
 struct hyfi_net_bridge_port *hyfi_bridge_get_port(const struct net_bridge_port *p);
@@ -163,6 +164,17 @@ static inline int hyfi_bridge_should_flood(const struct hyfi_net_bridge_port *hy
 	return 0;
 }
 
+#define MAX_WDSEXT_IFACE 15
+struct WdsExt_ifaces {
+    char ifname[IFNAMSIZ];
+};
+
+struct WdsExt_iflist {
+    u_int32_t num_entries;
+    struct WdsExt_ifaces iflist[ MAX_WDSEXT_IFACE ];
+};
+
+int hyfi_bridge_get_WdsExt_iface_list(struct hyfi_net_bridge *hyfi_br, struct WdsExt_iflist *wdsExtlist);
 int hyfi_bridge_dev_event(struct hyfi_net_bridge *hyfi_br, unsigned long event,
 		struct net_device *dev);
 int hyfi_bridge_set_bridge_name(struct hyfi_net_bridge *hyfi_br, const char *br_name);

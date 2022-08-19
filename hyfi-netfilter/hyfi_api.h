@@ -92,6 +92,7 @@ enum {
 	HYFI_SET_BRIDGE_FWMODE,  /* special forwarding mode rules */
 	HYFI_SET_BRIDGE_TS_MODE,  /* traffic separation enabled */
 	HYFI_VERSION_COMPATIBILITY_CHECK,   /* Version compatibility check */
+	HYFI_GET_WDS_EXT_IFACE_LIST,   /* wds_ext iface list used in 4address conversion */
 
 	HYFI_GET_PORT_LIST = 0x100,
 	HYFI_SET_BRPORT_GROUP, /* port group number and type */
@@ -282,6 +283,8 @@ enum {
 	HYFI_EVENT_LINK_PORT_UP,
 	HYFI_EVENT_LINK_PORT_DOWN,
 	HYFI_EVENT_MAC_LEARN_ON_PORT,
+	HYFI_EVENT_BR_JOIN,
+	HYFI_EVENT_BR_LEAVE,
 };
 
 struct __hfdb_entry {
