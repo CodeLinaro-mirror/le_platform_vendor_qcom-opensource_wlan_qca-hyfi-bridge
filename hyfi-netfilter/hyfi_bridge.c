@@ -965,7 +965,8 @@ static int hyfi_bridge_init_bridge_device(struct hyfi_net_bridge *hyfi_br, const
 
 	/* Default bridge configuration */
 	hyfi_br->flags = HYFI_BRIDGE_FLAG_MODE_RELAY_OVERRIDE
-			| HYFI_BRIDGE_FLAG_MODE_TCP_SP;
+			| HYFI_BRIDGE_FLAG_MODE_TCP_SP
+			| HYFI_BRIDGE_FLAG_FWMODE_NO_HYBRID_TABLES;
 
 	br_dev->needed_headroom += 80;
 
