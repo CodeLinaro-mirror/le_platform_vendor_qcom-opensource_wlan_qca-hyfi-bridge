@@ -127,6 +127,7 @@ enum {
 	HYFI_SET_SP_RULE = 0x700, /* Service priortization rule */
 	HYFI_FLUSH_SP_RULES,
 	HYFI_SET_MSCS_RULE,
+	HYFI_SET_SCS_RULE,
 };
 
 /* Bridge mode:
@@ -458,16 +459,16 @@ struct __mscs_rule {
 	u_int32_t id;
 	/// add-remove filter rule bit.
 	/// 1 means add 0 means delete
-	u_int8_t add_delete_rule ;
+	u_int8_t add_delete_rule;
 	/// rule precedence – higher number means higher priority.
 	u_int8_t rule_precedence;
 	/// rule output the value of or method  used to select the 802.1q c-tag
 	/// pcp value with which  to mark the matched packet.
 	u_int8_t rule_output;
 	/// match source mac address flag
-	u_int8_t match_source_mac ;
+	u_int8_t match_source_mac;
 	/// match destination mac address flags
-	u_int8_t match_dst_mac ;
+	u_int8_t match_dst_mac;
 	/// source mac address
 	/// If “Match Source IPv6 Address” flag bit is set to one,
 	/// this field shall be included, otherwise this field shall be omitted.
@@ -478,6 +479,61 @@ struct __mscs_rule {
 	u_int8_t da[6];
 	/// MSCS TID bitmap
 	u_int8_t mscs_tid_bitmap;
+};
+
+struct __scs_rule {
+	/// service prioritization rule identifier.
+	u_int32_t id;
+	/// add-remove filter rule bit.
+	/// 1 means add 0 means delete
+	u_int8_t add_delete_rule;
+	/// rule precedence – higher number means higher priority.
+	u_int8_t rule_precedence;
+	/// rule output the value of or method  used to select the 802.1q c-tag
+	/// pcp value with which  to mark the matched packet.
+	u_int8_t rule_output;
+	/// Match ip version type
+	u_int8_t match_ip_version_type;
+	/// match source mac address flag
+	u_int8_t match_dst_mac;
+	/// Match Destination port flags
+	u_int8_t match_dst_port;
+	/// Match Destination IPv4 Address flags
+	u_int8_t match_dst_ipv4;
+	/// match source mac address flag
+	u_int8_t match_source_mac;
+	/// Match Source port flag
+	u_int8_t match_source_port;
+	/// Match Source IPv4 Address flag
+	u_int8_t match_source_ipv4;
+
+	/// IP version type
+	u_int8_t ip_version_type;
+
+	/// destination mac address
+	/// if “match destination mac address” flag bit is set to one,
+	/// this field shall be included, otherwise this field shall be omitted.
+	u_int8_t da[6];
+	/// Destination Port
+	u_int16_t dst_port;
+	/// Destination IPv4 Address
+	/// If “Match Destination IPv4 Address” flag bit is set to one,
+	/// this field shall be included, otherwise this field shall be omitted.
+	u_int32_t dst_ipv4_addr;
+
+	/// source mac address
+	/// if “match source mac address” flag bit is set to one,
+	/// this field shall be included, otherwise this field shall be omitted.
+	u_int8_t sa[6];
+	/// Source Port
+	u_int16_t src_port;
+	/// Source IPv4 Address
+	/// If “Match Source IPv4 Address” flag bit is set to one,
+	/// this field shall be included, otherwise this field shall be omitted.
+	u_int32_t src_ipv4_addr;
+
+	/// DSCP value
+	u_int8_t dscp;
 };
 
 #endif

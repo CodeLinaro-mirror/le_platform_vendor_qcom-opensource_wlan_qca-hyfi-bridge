@@ -842,15 +842,15 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				to_emesh_sp.rule_precedence = msg_value->rule_precedence;
 				DEBUG_INFO("Rule Precedence = 0x%x \n", to_emesh_sp.rule_precedence);
 
-				to_emesh_sp.inner.rule_output = msg_value->rule_output;
+				to_emesh_sp.inner.rule_output = 0x09;
 				DEBUG_INFO("Rule Output = 0x%x \n", to_emesh_sp.inner.rule_output);
 
 				if (msg_value->match_source_mac)
-						to_emesh_sp.inner.flags |= SP_RULE_FLAG_MATCH_SOURCE_MAC;
+						to_emesh_sp.inner.flags_sawf |= SP_RULE_FLAG_MATCH_SAWF_SOURCE_MAC;
 				DEBUG_INFO("match_source_mac = 0x%x \n", msg_value->match_source_mac);
 
 				if (msg_value->match_dst_mac)
-						to_emesh_sp.inner.flags |= SP_RULE_FLAG_MATCH_DST_MAC;
+						to_emesh_sp.inner.flags_sawf |= SP_RULE_FLAG_MATCH_SAWF_DST_MAC;
 				DEBUG_INFO("match_dst_mac = 0x%x \n", msg_value->match_dst_mac);
 
 				for (i = 0; i < ETH_ALEN; i++)
@@ -871,6 +871,107 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				to_emesh_sp.classifier_type = SP_RULE_TYPE_MSCS;
 				sp_mapdb_rule_update(&to_emesh_sp);
 				#endif
+#endif
+
+				break;
+			}
+			case HYFI_SET_SCS_RULE:{
+
+#ifdef HYFI_BRIDGE_EMESH_ENABLE
+				struct __scs_rule *msg_value = (struct __scs_rule *)hymsgdata;
+				struct sp_rule to_emesh_sp = {0};
+				int i = 0;
+
+				DEBUG_INFO(" \n *** Recieved SCS rule *** \n");
+
+				to_emesh_sp.id = msg_value->id;
+				DEBUG_INFO("Rule id:  %08x \n", msg_value->id);
+
+				if (msg_value->add_delete_rule == 0)
+				{
+						to_emesh_sp.cmd = SP_MAPDB_ADD_REMOVE_FILTER_DELETE;
+						DEBUG_INFO("Deleting rule \n");
+				}
+				else if (msg_value->add_delete_rule == 1)
+				{
+						to_emesh_sp.cmd = SP_MAPDB_ADD_REMOVE_FILTER_ADD;
+						DEBUG_INFO("Adding rule \n");
+				}
+				else
+				{
+						DEBUG_INFO(" \nInvalid add/delete rule %d \n", msg_value->add_delete_rule);
+						break;
+				}
+
+				to_emesh_sp.rule_precedence = msg_value->rule_precedence;
+				DEBUG_INFO("Rule Precedence = 0x%x \n", to_emesh_sp.rule_precedence);
+
+				to_emesh_sp.inner.rule_output = msg_value->rule_output;
+				DEBUG_INFO("Rule Output = 0x%x \n", to_emesh_sp.inner.rule_output);
+
+				to_emesh_sp.inner.flags_sawf |= SP_RULE_FLAG_MATCH_SAWF_IP_VERSION_TYPE;
+
+				if (msg_value->match_dst_mac)
+						to_emesh_sp.inner.flags_sawf |= SP_RULE_FLAG_MATCH_SAWF_DST_MAC;
+				DEBUG_INFO("match_dst_mac = 0x%x \n", msg_value->match_dst_mac);
+
+				if (msg_value->match_dst_port)
+						to_emesh_sp.inner.flags_sawf |= SP_RULE_FLAG_MATCH_SAWF_DST_PORT;
+				DEBUG_INFO("match_dst_port = 0x%x \n", msg_value->match_dst_port);
+
+				if (msg_value->match_dst_ipv4)
+						to_emesh_sp.inner.flags_sawf |= SP_RULE_FLAG_MATCH_SAWF_DST_IPV4;
+				DEBUG_INFO("match_dst_ipv4 = 0x%x \n", msg_value->match_dst_ipv4);
+
+				if (msg_value->match_source_mac)
+						to_emesh_sp.inner.flags_sawf |= SP_RULE_FLAG_MATCH_SAWF_SOURCE_MAC;
+				DEBUG_INFO("match_source_mac = 0x%x \n", msg_value->match_source_mac);
+
+				if (msg_value->match_source_port)
+						to_emesh_sp.inner.flags_sawf |= SP_RULE_FLAG_MATCH_SAWF_SRC_PORT;
+				DEBUG_INFO("match_source_port = 0x%x \n", msg_value->match_source_port);
+
+				if (msg_value->match_dst_ipv4)
+						to_emesh_sp.inner.flags_sawf |= SP_RULE_FLAG_MATCH_SAWF_SRC_IPV4;
+				DEBUG_INFO("match_dst_ipv4 = 0x%x \n", msg_value->match_dst_ipv4);
+
+				to_emesh_sp.inner.ip_version_type = 0x04;
+
+				for (i = 0; i < ETH_ALEN; i++)
+				{
+					to_emesh_sp.inner.da[i] = msg_value->da[i];
+				}
+				DEBUG_INFO("da = %02x:%02x:%02x:%02x:%02x:%02x \n", msg_value->da[0], msg_value->da[1],
+								msg_value->da[2], msg_value->da[3],
+								msg_value->da[4], msg_value->da[5]);
+				to_emesh_sp.inner.dst_port = msg_value->dst_port;
+				DEBUG_INFO("dst_port = 0x%x \n", msg_value->dst_port);
+				to_emesh_sp.inner.dst_ipv4_addr = msg_value->dst_ipv4_addr;
+				DEBUG_INFO("dst_ipv4_addr = %d.%d.%d.%d \n", (msg_value->dst_ipv4_addr & 0x000000FF),
+							(msg_value->dst_ipv4_addr & 0x0000FF00) >> 8,
+							(msg_value->dst_ipv4_addr & 0x00FF0000) >> 16,
+							(msg_value->dst_ipv4_addr & 0xFF000000) >> 24);
+
+				for (i = 0; i < ETH_ALEN; i++)
+				{
+					to_emesh_sp.inner.sa[i] = msg_value->sa[i];
+				}
+				DEBUG_INFO("sa = %02x:%02x:%02x:%02x:%02x:%02x \n", msg_value->sa[0], msg_value->sa[1],
+								msg_value->sa[2], msg_value->sa[3],
+								msg_value->sa[4], msg_value->sa[5]);
+				to_emesh_sp.inner.src_port = msg_value->src_port;
+				DEBUG_INFO("src_port = 0x%x \n", msg_value->src_port);
+				to_emesh_sp.inner.src_ipv4_addr = msg_value->src_ipv4_addr;
+				DEBUG_INFO("src_ipv4 = %d.%d.%d.%d \n", (msg_value->src_ipv4_addr & 0x000000FF),
+							(msg_value->src_ipv4_addr & 0x0000FF00) >> 8,
+							(msg_value->src_ipv4_addr & 0x00FF0000) >> 16,
+							(msg_value->src_ipv4_addr & 0xFF000000) >> 24);
+
+				to_emesh_sp.inner.dscp = msg_value->dscp;
+				DEBUG_INFO("dscp = 0x%x \n", msg_value->dscp);
+
+				to_emesh_sp.classifier_type = SP_RULE_TYPE_SCS;
+				sp_mapdb_rule_update(&to_emesh_sp);
 #endif
 
 				break;
