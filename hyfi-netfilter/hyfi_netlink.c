@@ -822,8 +822,6 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 			case HYFI_SET_MSCS_RULE:{
 
 #ifdef HYFI_BRIDGE_EMESH_ENABLE
-				// Todo: Enable after emesh-s check in
-				#if 0
 				struct __mscs_rule *msg_value = (struct __mscs_rule *)hymsgdata;
 				struct sp_rule to_emesh_sp = {0};
 				int i = 0;
@@ -880,7 +878,6 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				DEBUG_INFO("MSCS tid bitmap = 0x%x \n", to_emesh_sp.inner.mscs_tid_bitmap);
 				to_emesh_sp.classifier_type = SP_RULE_TYPE_MSCS;
 				sp_mapdb_rule_update(&to_emesh_sp);
-				#endif
 #endif
 
 				break;
