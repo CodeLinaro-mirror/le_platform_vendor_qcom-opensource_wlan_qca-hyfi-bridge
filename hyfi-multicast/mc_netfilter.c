@@ -21,8 +21,10 @@
 #include "mc_api.h"
 #include "hyfi_osdep.h"
 
+/*TODO: cleanup for multicast hook */
 #ifdef HYFI_MC_STANDALONE_NF
-#define HYFI_MC_STATIC static
+//#define HYFI_MC_STATIC static
+#define HYFI_MC_STATIC
 #else
 #define HYFI_MC_STATIC
 #endif
@@ -198,7 +200,7 @@ drop:
     return NF_DROP;
 }
 
-#ifdef HYFI_MC_STANDALONE_NF
+#if defined (HYFI_MC_STANDALONE_NF) && defined (HYFI_MULTICAST_SUPPORT)
 static struct nf_hook_ops mc_hook_ops[] __read_mostly =
 {
 	{
@@ -225,7 +227,9 @@ static struct nf_hook_ops mc_hook_ops[] __read_mostly =
 int __init mc_netfilter_init(void)
 {
     int ret = 0;
-#ifdef HYFI_MC_STANDALONE_NF
+    //The below code are not used to register multicast hooks
+    //so they are not used. TODO: cleanup this code.
+#if defined (HYFI_MC_STANDALONE_NF) && defined (HYFI_MULTICAST_SUPPORT)
     ret = nf_register_hook(&mc_hook_ops[0]);
     ret |= nf_register_hook(&mc_hook_ops[1]);
 #endif
@@ -234,7 +238,7 @@ int __init mc_netfilter_init(void)
 
 void mc_netfilter_exit(void)
 {
-#ifdef HYFI_MC_STANDALONE_NF
+#if defined (HYFI_MC_STANDALONE_NF) && defined (HYFI_MULTICAST_SUPPORT)
     nf_unregister_hook(&mc_hook_ops[0]);
     nf_unregister_hook(&mc_hook_ops[1]);
 #endif

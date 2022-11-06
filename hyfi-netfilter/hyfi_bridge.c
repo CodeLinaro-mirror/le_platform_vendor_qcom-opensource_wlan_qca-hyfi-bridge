@@ -905,8 +905,10 @@ static int hyfi_bridge_deinit_bridge_device(struct hyfi_net_bridge *hf_br)
 	hf_br->linux_bridge[0] = 0;
 	br_dev->needed_headroom -= 80;
 
+#ifdef HYFI_MULTICAST_SUPPORT
 	/* Multicast module detach to the bridge */
 	mc_detach(hf_br);
+#endif
 
 	hyfi_bridge_del_ports(hf_br);
 #ifndef DISABLE_APS_HOOKS
@@ -967,9 +969,11 @@ static int hyfi_bridge_init_bridge_device(struct hyfi_net_bridge *hyfi_br, const
 	/* see br_if.c */
 	rcu_assign_pointer(br_port_dev_get_hook, hyfi_bridge_port_dev_get);
 #endif
+#ifdef HYFI_MULTICAST_SUPPORT
 	/* Multicast module attach to the bridge */
 	if (mc_attach(hyfi_br)<0)
 		return -1;
+#endif
 
 	DEBUG_INFO("hyfi: Bridge %s is now attached\n", br_dev->name);
 

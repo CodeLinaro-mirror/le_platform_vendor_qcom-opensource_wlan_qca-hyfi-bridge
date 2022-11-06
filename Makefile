@@ -54,6 +54,12 @@ ifeq ($(strip ${DISABLE_SSDK_SUPPORT}),1)
 ccflags-y+=-DHYFI_DISABLE_SSDK_SUPPORT
 endif
 
+ifeq ($(strip ${HYFI_MULTICAST_SUPPORT}),1)
+ccflags-y+=-DHYFI_MULTICAST_SUPPORT
+else
+ccflags-y+=-DHYFI_MC_STANDALONE_NF
+endif
+
 # #############################################################################
 # Debug flags, set these to = 0 if you want to disable all debugging.
 # By turning off debugs you gain maximum performance.

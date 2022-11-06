@@ -44,9 +44,11 @@ static int __init hyfi_init(void)
 		goto out;
 	}
 
+#ifdef HYFI_MULTICAST_SUPPORT
 	if ((ret = mc_init())) {
 		goto out;
 	}
+#endif
 
 	if ((ret = hyfi_netfilter_init())) {
 		goto out;
@@ -71,7 +73,9 @@ static void __exit hyfi_exit(void)
 	hyfi_netlink_fini();
 	hyfi_notify_fini();
 	hyfi_netfilter_fini();
+#ifdef HYFI_MULTICAST_SUPPORT
 	mc_exit();
+#endif
 	hyfi_bridge_fini();
 
 	DEBUG_INFO("QCA Hy-Fi netfilter uninstalled\n");
