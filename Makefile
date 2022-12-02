@@ -34,10 +34,16 @@ INCLUDES := -I$(CURDIR) \
 
 ifeq ($(strip ${HYFI_BRIDGE_EMESH_ENABLE}),1)
 ccflags-y+=-DHYFI_BRIDGE_EMESH_ENABLE
+ifneq ($(CONFIG_BUILD_YOCTO),y)
 INCLUDES+= -I$(STAGING_DIR)/usr/include/emesh-sp
+endif
 endif
 
 export EXTRA_CFLAGS += $(INCLUDES)
+
+ifeq ($(CONFIG_BUILD_YOCTO),y)
+EXTRA_CFLAGS += $(HYFI_CFLAGS)
+endif
 
 # Module extra compilation flags
 EXTRA_CFLAGS += -Werror -Wall -g $(QCACFLAGS)
