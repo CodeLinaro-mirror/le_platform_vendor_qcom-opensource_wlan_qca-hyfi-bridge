@@ -206,6 +206,7 @@ enum __HY_MISUSE_PROTECT( hyInterfaceType ) {
 	__HY_MISUSE_PROTECT( hyInterface_HPAV ),
 	__HY_MISUSE_PROTECT( hyInterface_ETH ),
 	__HY_MISUSE_PROTECT( hyInterface_WIFI_6G ),
+	__HY_MISUSE_PROTECT( hyInterface_MLD ),
 
 	__HY_MISUSE_PROTECT( hyInterface_NumberOfChildInterfaces ), /* Use this constant for arrays containing only child interfaces */
 
