@@ -110,7 +110,7 @@ static void hyfi_wdsExt_device_event(unsigned long event,
     hyfi_br = hyfi_bridge_get_first_br();
 
     if (!hyfi_br || hyfi_br->event_pid == NLEVENT_INVALID_PID) {
-        DEBUG_ERROR("%s: Invalid event PID. wds_ext iface event failed\n", __func__);
+        DEBUG_TRACE("Invalid event PID. wds_ext iface event failed\n");
         return;
     }
 
