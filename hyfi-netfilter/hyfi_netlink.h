@@ -51,7 +51,7 @@ void hyfi_netlink_fini(void);
  * these values are set based on the backward compatibility
  * ==============================================================*/
 #define MAP_PKG_NAME "easymesh"
-#define MAP_MAJOR_VERION    11
+#define MAP_MAJOR_VERION    12
 #define MAP_MINOR_VERION    0
 #define MAP_COMPATIBILITY   0
 #define MAP_SU_BUILD        0
