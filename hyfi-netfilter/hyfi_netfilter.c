@@ -228,6 +228,35 @@ unsigned int hyfi_netfilter_local_out_hook(unsigned int hooknum,
 	struct net_bridge_port *br_port = hyfi_br_port_get(out);
 	struct hyfi_net_bridge_port *hyfi_p = hyfi_bridge_get_port(br_port);
 
+	if (hyfi_br && hyfi_br->isController && hyfi_is_ieee1905_pkt(skb)) {
+		struct net_bridge_fdb_entry *hsrc;
+		struct sk_buff *skb2;
+		unsigned char *dest_addr, *src_addr;
+		struct hyfi_net_bridge *hyfi_br;
+		const struct net_bridge *br;
+		src_addr = eth_hdr(skb)->h_source;
+		dest_addr = eth_hdr(skb)->h_dest;
+		br = netdev_priv(BR_INPUT_SKB_CB(skb)->brdev);
+		hyfi_br = hyfi_bridge_get(br);
+
+		if (unlikely(!br || !hyfi_br || !hyfi_br->dev || br->dev != hyfi_br->dev)) {
+			return NF_ACCEPT;
+		}
+
+		if ((hsrc = os_br_fdb_get((struct net_bridge *)br, eth_hdr(skb)->h_source)) &&
+			hsrc->is_local && is_multicast_ether_addr(eth_hdr(skb)->h_dest)) {
+			if (hyfi_ieee1905_msg_type(skb) == IEEE1905_MSG_TYPE_TOPOLOGY_DISCOVERY) {
+				hyfi_ieee1905_frame_filter(skb, skb->dev);
+				skb2 = skb_clone(skb, GFP_ATOMIC);
+
+				if (skb2) {
+					skb2->dev = hyfi_br->dev;
+					netif_receive_skb(skb2);
+					return NF_DROP;
+				}
+			}
+		}
+	}
 	if (unlikely(!hyfi_br || !br_port || !hyfi_p)) {
 		return NF_ACCEPT;
 	}
