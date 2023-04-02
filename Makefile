@@ -92,7 +92,7 @@ $(TARGET)-objs := \
 	$(HYFI_MC)/mc_snooping.o \
 	$(HYFI_MC)/mc_forward.o
 
-ifneq ($(CONFIG_BUILD_YOCTO),y)
+ifneq ($(CONFIG_DISABLE_APS_HOOKS),y)
 $(TARGET)-objs += \
 	$(HYFI_NF)/hyfi_hatbl.o \
 	$(HYFI_NF)/hyfi_hdtbl.o \
@@ -101,7 +101,6 @@ $(TARGET)-objs += \
 	$(HYFI_MC)/mc_ecm.o
 else
 ccflags-y+=-DDISABLE_APS_HOOKS
-ccflags-y+=-DBUILD_YOCTO
 endif
 
 else
