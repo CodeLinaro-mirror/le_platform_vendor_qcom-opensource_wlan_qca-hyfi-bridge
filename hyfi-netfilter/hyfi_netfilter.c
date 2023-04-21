@@ -245,15 +245,13 @@ unsigned int hyfi_netfilter_local_out_hook(unsigned int hooknum,
 
 		if ((hsrc = os_br_fdb_get((struct net_bridge *)br, eth_hdr(skb)->h_source)) &&
 			hsrc->is_local && is_multicast_ether_addr(eth_hdr(skb)->h_dest)) {
-			if (hyfi_ieee1905_msg_type(skb) == IEEE1905_MSG_TYPE_TOPOLOGY_DISCOVERY) {
-				hyfi_ieee1905_frame_filter(skb, skb->dev);
-				skb2 = skb_clone(skb, GFP_ATOMIC);
+			hyfi_ieee1905_frame_filter(skb, skb->dev);
+			skb2 = skb_clone(skb, GFP_ATOMIC);
 
-				if (skb2) {
-					skb2->dev = hyfi_br->dev;
-					netif_receive_skb(skb2);
-					return NF_DROP;
-				}
+			if (skb2) {
+				skb2->dev = hyfi_br->dev;
+				netif_receive_skb(skb2);
+				return NF_DROP;
 			}
 		}
 	}
