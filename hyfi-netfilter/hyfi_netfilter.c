@@ -244,7 +244,9 @@ unsigned int hyfi_netfilter_local_out_hook(unsigned int hooknum,
 		}
 
 		if ((hsrc = os_br_fdb_get((struct net_bridge *)br, eth_hdr(skb)->h_source)) &&
-			hsrc->is_local && is_multicast_ether_addr(eth_hdr(skb)->h_dest)) {
+			hsrc->is_local && is_multicast_ether_addr(eth_hdr(skb)->h_dest) &&
+			!strcmp(br_port->dev->name, hyfi_br->colocatedIfName)) {
+
 			hyfi_ieee1905_frame_filter(skb, skb->dev);
 			skb2 = skb_clone(skb, GFP_ATOMIC);
 

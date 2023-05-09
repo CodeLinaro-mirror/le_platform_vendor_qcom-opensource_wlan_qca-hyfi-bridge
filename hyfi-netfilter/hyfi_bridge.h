@@ -58,6 +58,7 @@ struct hyfi_net_bridge {
 	char linux_bridge[IFNAMSIZ]; /* Linux bridge name */
 	u_int8_t TSEnabled;
 	u_int8_t isController;
+	char colocatedIfName[IFNAMSIZ]; /* interface name of colocated dev */
 };
 
 struct hyfi_net_bridge_port {

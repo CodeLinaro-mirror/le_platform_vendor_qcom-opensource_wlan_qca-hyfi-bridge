@@ -1023,6 +1023,19 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 				break;
 			};
 
+			case HYFI_SET_COLOCATED_IFNAME:
+			{
+				char *p = hymsgdata;
+
+				DEBUG_INFO(" \n *** Recieved colocated if update br:%s if:%s ***\n", hymsghdr->if_name, p);
+				spin_lock_bh(&br->lock);
+				memcpy(br->colocatedIfName, p, IFNAMSIZ);
+				spin_unlock_bh( &br->lock);
+
+				hymsghdr->status = HYFI_STATUS_SUCCESS;
+				break;
+			};
+
 			default:
 				DEBUG_WARN("hyfi: Unknown message type 0x%x\n", msgtype);
 				hymsghdr->status = HYFI_STATUS_INVALID_PARAMETER;
