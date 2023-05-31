@@ -66,6 +66,10 @@ else
 ccflags-y+=-DHYFI_MC_STANDALONE_NF
 endif
 
+ifeq ($(CONFIG_DISABLE_APS_HOOKS),y)
+ccflags-y+=-DDISABLE_APS_HOOKS
+endif
+
 # #############################################################################
 # Debug flags, set these to = 0 if you want to disable all debugging.
 # By turning off debugs you gain maximum performance.
@@ -99,30 +103,11 @@ $(TARGET)-objs += \
 	$(HYFI_NF)/hyfi_aggr.o \
 	$(HYFI_NF)/hyfi_ecm.o \
 	$(HYFI_MC)/mc_ecm.o
-else
-ccflags-y+=-DDISABLE_APS_HOOKS
+
+
 endif
 
-else
-
-# Makefile targets - part 1
-
-all: build install
-
 build:
-	@$(MAKE) -C $(KERNELPATH) M=`pwd` modules MDIR=$(CURDIR)
-
-install:
-	@install -m 644 $(TARGET).ko $(MODULEPATH)
-	@install -m 644 $(KERNELPATH)/net/bridge/bridge.ko $(MODULEPATH)
-	@install -m 644 $(KERNELPATH)/net/llc/llc.ko $(MODULEPATH)
-	@install -m 644 $(KERNELPATH)/net/802/stp.ko $(MODULEPATH)
-
-uninstall:
-	@find $(MODULEPATH) -name $(TARGET).ko | xargs rm -rf
-
-clean:
-	@$(MAKE) -C $(KERNELPATH) M=`pwd` clean
-	@rm -f Module.symvers
+	@$(MAKE) -C $(KERNEL_SRC) M=$(M) V=1 modules
 
 endif

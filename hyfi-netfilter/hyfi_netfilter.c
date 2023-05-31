@@ -179,7 +179,7 @@ unsigned int hyfi_netfilter_forwarding_hook(unsigned int hooknum,
 		}
 
 		/* Should flood */
-		if (!hyfi_br->flags & HYFI_BRIDGE_FLAG_MODE_RELAY_OVERRIDE) {
+		if (!(hyfi_br->flags & HYFI_BRIDGE_FLAG_MODE_RELAY_OVERRIDE)) {
 			if (unlikely(is_multicast_ether_addr(eth_hdr(skb)->h_dest))) {
 				if (!hyfi_bridge_should_flood(hyfi_dst_p, skb)) {
 					return NF_DROP;
@@ -231,9 +231,10 @@ unsigned int hyfi_netfilter_local_out_hook(unsigned int hooknum,
 	if (hyfi_br && hyfi_br->isController && hyfi_is_ieee1905_pkt(skb)) {
 		struct net_bridge_fdb_entry *hsrc;
 		struct sk_buff *skb2;
-		unsigned char *dest_addr, *src_addr;
+		unsigned char *dest_addr = NULL, *src_addr = NULL;
 		struct hyfi_net_bridge *hyfi_br;
 		const struct net_bridge *br;
+
 		src_addr = eth_hdr(skb)->h_source;
 		dest_addr = eth_hdr(skb)->h_dest;
 		br = netdev_priv(BR_INPUT_SKB_CB(skb)->brdev);
@@ -243,8 +244,9 @@ unsigned int hyfi_netfilter_local_out_hook(unsigned int hooknum,
 			return NF_ACCEPT;
 		}
 
-		if ((hsrc = os_br_fdb_get((struct net_bridge *)br, eth_hdr(skb)->h_source)) &&
-			hsrc->is_local && is_multicast_ether_addr(eth_hdr(skb)->h_dest) &&
+
+		if ((hsrc = os_br_fdb_get((struct net_bridge *)br, src_addr)) &&
+			hsrc->is_local && is_multicast_ether_addr(dest_addr) &&
 			!strcmp(br_port->dev->name, hyfi_br->colocatedIfName)) {
 
 			hyfi_ieee1905_frame_filter(skb, skb->dev);

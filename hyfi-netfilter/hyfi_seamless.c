@@ -55,6 +55,7 @@ struct nbuf_cb {
 #define N_ANT_TRAIN		0x8000		/* frame is smart antenna training packet */
 };
 
+#ifdef HYFI_SUPPORT_PSW
 static inline void hyfi_psw_read_idx(struct sk_buff *skb,
 		struct ha_psw_stm_entry *pha_psw_stm_entry)
 {
@@ -71,6 +72,7 @@ static inline void hyfi_psw_read_idx(struct sk_buff *skb,
 		}
 	}
 }
+#endif
 
 void hyfi_psw_init(struct hyfi_net_bridge *br)
 {

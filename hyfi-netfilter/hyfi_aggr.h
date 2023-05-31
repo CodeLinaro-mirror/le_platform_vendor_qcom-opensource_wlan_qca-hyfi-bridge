@@ -120,7 +120,7 @@ static inline void hyfi_aggr_tag_packet(struct net_hatbl_entry *ha,
 
 static inline u_int16_t hyfi_aggr_find_next_seq(struct net_hatbl_entry *ha)
 {
-	u_int32_t min_idx = ~0, i;
+	u_int32_t i;
 	u_int16_t min_seq_delta = ~0;
 	u_int16_t next_seq = ~0;
 
@@ -143,7 +143,6 @@ static inline u_int16_t hyfi_aggr_find_next_seq(struct net_hatbl_entry *ha)
 			if (q_seq - ha->aggr_rx_entry->aggr_next_seq <= min_seq_delta) {
 				min_seq_delta = q_seq - ha->aggr_rx_entry->aggr_next_seq;
 				next_seq = ha->aggr_rx_entry->hyfi_iface_info[i].seq;
-				min_idx = i;
 			}
 		}
 	}

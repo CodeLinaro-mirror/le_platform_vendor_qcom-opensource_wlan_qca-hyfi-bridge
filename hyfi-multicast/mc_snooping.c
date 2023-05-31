@@ -2790,7 +2790,6 @@ static void mc_mdb_cleanup(unsigned long data)
         os_hlist_for_each_entry_rcu(mdb, mdbh, &mc->hash[i], hlist) {
             struct mc_port_group *pg;
             struct hlist_node *pgh;
-            struct net_bridge_port *port;
             unsigned long expire_time = mc->membership_interval;
 
             if (hlist_empty(&mdb->pslist)) {
@@ -2825,7 +2824,6 @@ static void mc_mdb_cleanup(unsigned long data)
                     else if (time_before(this_timer, next_timer))
                         next_timer = this_timer;
                 }
-                port = pg->port;
             }
 #if 0
             if (hlist_empty(&mdb->pslist)) {

@@ -195,7 +195,7 @@ int hyfi_bridge_dev_event(struct hyfi_net_bridge *hyfi_br,
 	case NETDEV_UNREGISTER:
 		if (!hyfi_br->dev)
 			break;
-		if ((dev->name) && !strcmp(dev->name, hyfi_br->linux_bridge)) {
+		if (!strcmp(dev->name, hyfi_br->linux_bridge)) {
 			if (dev->priv_flags & IFF_EBRIDGE) {
 				hyfi_bridge_deinit_bridge_device(hyfi_br);
 				sync_and_free = 1;
@@ -624,8 +624,8 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 	/* hybrid look up first */
 	u_int32_t flag, priority;
 	u_int32_t hash;
-	u_int32_t traffic_class;
 #ifndef DISABLE_APS_HOOKS
+	u_int32_t traffic_class = 0;
 	struct net_hatbl_entry *ha = NULL;
 	struct net_hdtbl_entry *hd;
 	struct net_bridge_port *port;
@@ -645,6 +645,7 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 		br = netdev_priv(BR_INPUT_SKB_CB(*skb)->brdev);
 	}
 
+
 	hyfi_br = hyfi_bridge_get(br);
 
 	if (unlikely(!br || !hyfi_br || !hyfi_br->dev || br->dev != hyfi_br->dev))
@@ -662,9 +663,9 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 			*/
 			src_addr = eth_hdr(*skb)->h_source;
 			dest_addr = eth_hdr(*skb)->h_dest;
-			if ((dst = os_br_fdb_get((struct net_bridge *)br, eth_hdr(*skb)->h_dest)) &&
+			if ((dst = os_br_fdb_get((struct net_bridge *)br, dest_addr)) &&
 				dst->is_local) {
-				if ((hsrc = os_br_fdb_get((struct net_bridge *)br, eth_hdr(*skb)->h_source)) &&
+				if ((hsrc = os_br_fdb_get((struct net_bridge *)br, src_addr)) &&
 					hsrc->is_local) {
 					hyfi_ieee1905_frame_filter(*skb, (*skb)->dev);
 					skb2 = skb_clone(*skb, GFP_ATOMIC);
@@ -687,9 +688,9 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 		return NULL;
 	}
 
+#ifndef DISABLE_APS_HOOKS
 	traffic_class = (flag & IS_IPPROTO_UDP) ?
 			HYFI_TRAFFIC_CLASS_UDP : HYFI_TRAFFIC_CLASS_OTHER;
-#ifndef DISABLE_APS_HOOKS
 	/* If incoming packet is a TCP stream, make sure that the TCP-ACK
 	 * stream will be transmitted back on the same medium (if hyfi_tcp_sp
 	 * is enabled).
@@ -900,7 +901,9 @@ int hyfi_bridge_should_deliver(const struct hyfi_net_bridge_port *src,
 static int hyfi_bridge_deinit_bridge_device(struct hyfi_net_bridge *hf_br)
 {
 	struct net_device *br_dev;
+#ifndef DISABLE_APS_HOOKS
 	int i, del_hooks = 1;
+#endif
 
 	/* Detach from existing bridge */
 	br_dev = hf_br->dev;
@@ -915,6 +918,7 @@ static int hyfi_bridge_deinit_bridge_device(struct hyfi_net_bridge *hf_br)
 	hf_br->linux_bridge[0] = 0;
 	br_dev->needed_headroom -= 80;
 
+
 #ifdef HYFI_MULTICAST_SUPPORT
 	/* Multicast module detach to the bridge */
 	mc_detach(hf_br);
@@ -927,11 +931,11 @@ static int hyfi_bridge_deinit_bridge_device(struct hyfi_net_bridge *hf_br)
 #endif
 	rcu_assign_pointer(hf_br->dev, NULL);
 
+#ifndef DISABLE_APS_HOOKS
 	for (i = 0; i < HYFI_BRIDGE_MAX; i++) {
 		if (hyfi_bridges[i].dev != NULL)
 			del_hooks = 0;
 	}
-#ifndef DISABLE_APS_HOOKS
 	if (del_hooks) {
 		rcu_assign_pointer(br_get_dst_hook, NULL);
 		rcu_assign_pointer(br_port_dev_get_hook, NULL);

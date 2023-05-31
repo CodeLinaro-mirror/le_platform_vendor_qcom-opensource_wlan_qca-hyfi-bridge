@@ -120,7 +120,7 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 	struct sk_buff *skb;
 	struct nlmsghdr *nlh = NULL;
 	void *hymsgdata = NULL;
-	u32 pid, seq, msgtype;
+	u32 pid, msgtype;
 #ifndef DISABLE_APS_HOOKS
 	u32 retval;
 #endif
@@ -137,11 +137,11 @@ static void hyfi_netlink_receive(struct sk_buff *__skb)
 		/* process netlink message pointed by skb->data */
 		nlh = nlmsg_hdr(skb);
 		pid = nlh->nlmsg_pid;
-		seq = nlh->nlmsg_seq;
 		hymsghdr = NLMSG_DATA( nlh );
 		hymsghdr->status = HYFI_STATUS_SUCCESS;
 		hymsgdata = HYFI_MSG_DATA(nlh);
 		msgtype = nlh->nlmsg_type;
+
 
 		brdev = dev_get_by_name(&init_net, hymsghdr->if_name);
 		if (!brdev) {

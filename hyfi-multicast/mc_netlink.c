@@ -410,7 +410,7 @@ void mc_group_notify_one(struct mc_struct *mc, struct mc_ip *pgroup)
 
     if (pgroup->pro == htons(ETH_P_IP))
     {
-         hyfi_bridge_ipv4_mc_update_callback_t ipv4_mc_event_cb;
+         hyfi_bridge_ipv4_mc_update_callback_t ipv4_mc_event_cb = NULL;
 #ifndef DISABLE_APS_HOOKS
          ipv4_mc_event_cb = hyfi_bridge_ipv4_mc_update_callback_get();
 #endif
@@ -423,7 +423,7 @@ void mc_group_notify_one(struct mc_struct *mc, struct mc_ip *pgroup)
 #ifdef HYBRID_MC_MLD
     else
     {
-        hyfi_bridge_ipv6_mc_update_callback_t ipv6_mc_event_cb;
+        hyfi_bridge_ipv6_mc_update_callback_t ipv6_mc_event_cb = NULL;
 #ifndef DISABLE_APS_HOOKS
         ipv6_mc_event_cb = hyfi_bridge_ipv6_mc_update_callback_get();
 #endif
@@ -526,7 +526,7 @@ static void __mc_netlink_receive(struct sk_buff *__skb)
     struct sk_buff *skb;
     struct nlmsghdr *nlh = NULL;
     void *hymsgdata = NULL;
-    u32 pid, seq, msgtype;
+    u32 pid, msgtype;
     struct __hyctl_msg_header *hymsghdr;
     struct mc_struct *mc = NULL;
 
@@ -536,11 +536,11 @@ static void __mc_netlink_receive(struct sk_buff *__skb)
     if ((skb = skb_get(__skb)) == NULL)
 #endif
         return;
- 
+
+
     /* process netlink message pointed by skb->data */
     nlh = nlmsg_hdr(skb);
     pid = nlh->nlmsg_pid;
-    seq = nlh->nlmsg_seq;
     hymsghdr = NLMSG_DATA(nlh);
     hymsghdr->status = HYFI_STATUS_SUCCESS;
     hymsgdata = HYFI_MSG_DATA(nlh);
