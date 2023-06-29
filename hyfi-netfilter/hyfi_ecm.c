@@ -394,6 +394,8 @@ bool hyfi_ecm_port_matches(const struct hyfi_ecm_flow_data_t *flow,
 	traffic_class = (flow->flag & ECM_HYFI_IS_IPPROTO_UDP) ?
 		HYFI_TRAFFIC_CLASS_UDP : HYFI_TRAFFIC_CLASS_OTHER;
 
+	DEBUG_TRACE("hyfi_ecm_port_matches: Value of traffic class = %d\n", traffic_class);
+
 	/* Find H-Active entry - forward first */
 	/* Note not being able to find the entry or having an invalid
 	 *index is also OK - it just means HyFi is not interested in
