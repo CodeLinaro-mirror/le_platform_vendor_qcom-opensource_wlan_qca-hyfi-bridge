@@ -46,7 +46,7 @@ EXTRA_CFLAGS += $(HYFI_CFLAGS)
 endif
 
 # Module extra compilation flags
-EXTRA_CFLAGS += -Werror -Wall -g $(QCACFLAGS)
+EXTRA_CFLAGS += -Werror -Wall -Wno-error=implicit-fallthrough -g $(QCACFLAGS)
 
 ifeq ($(strip ${HYBRID_MC_MLD}),1)
 ccflags-y+=-DHYBRID_MC_MLD

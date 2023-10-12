@@ -2161,13 +2161,15 @@ static int mc_ipv4_rcv(struct mc_struct *mc, struct sk_buff *skb,
 
     switch (skb2->ip_summed) {
     case CHECKSUM_COMPLETE:
-        if (!csum_fold(skb2->csum))
+        if (!csum_fold(skb2->csum)) {
             break;
+        }
         /* fall through */
     case CHECKSUM_NONE:
         skb2->csum = 0;
-        if (skb_checksum_complete(skb2))
+        if (skb_checksum_complete(skb2)){
             goto out;
+        }
     }
 
     MC_SKB_CB(skb)->igmp = 1;
@@ -2307,8 +2309,9 @@ static int mc_ipv6_rcv(struct mc_struct *mc, struct sk_buff *skb,
     switch (skb2->ip_summed) {
         case CHECKSUM_COMPLETE:
             if (!csum_ipv6_magic(saddr, daddr, skb2->len, IPPROTO_ICMPV6,
-                        skb2->csum))
+                        skb2->csum)){
                 break;
+            }
             /* fall through */
         case CHECKSUM_NONE:
             skb2->csum = ~csum_unfold(csum_ipv6_magic(saddr, daddr, skb2->len,
