@@ -31,7 +31,10 @@ static inline int hyfi_br_pass_frame_up(struct sk_buff *skb)
 {
         struct net_device *indev, *brdev = BR_INPUT_SKB_CB(skb)->brdev;
         struct net_bridge *br = netdev_priv(brdev);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0))
+	struct pcpu_sw_netstats *brstats = this_cpu_ptr(br->dev->tstats);
+#elif ((LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)))
         struct pcpu_sw_netstats *brstats = this_cpu_ptr(br->stats);
 #else
         struct br_cpu_netstats *brstats = this_cpu_ptr(br->stats);

@@ -84,9 +84,9 @@ static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br,
 	bool *unlock_bh)
 {
 	u_int32_t traffic_class;
+	bool ret;
 	struct net_hatbl_entry *ha = NULL;
 	*unlock_bh = true;
-
 	*ha_ret = NULL;
 	traffic_class = (flow->flag & ECM_HYFI_IS_IPPROTO_UDP) ?
 			HYFI_TRAFFIC_CLASS_UDP : HYFI_TRAFFIC_CLASS_OTHER;
@@ -164,7 +164,15 @@ static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br,
 
 			dst = os_br_fdb_get(netdev_priv(br_dev), da);
 			/* Try and insert from FDB */
-			if (dst && !dst->is_local) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0))
+			if(dst)
+			ret = test_bit(BR_FDB_LOCAL, &dst->flags);
+#else
+			if(dst)
+			ret = dst->is_local;
+#endif
+
+			if (dst && !ret) {
 				ha = hyfi_hatbl_insert_from_fdb(hyfi_br, hash, dst->dst, sa,
 					da, hyfi_br->dev->dev_addr,
 					traffic_class, flow->priority, true /* keep_lock */);

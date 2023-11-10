@@ -32,6 +32,7 @@
 #include "hyfi_seamless.h"
 #include "hyfi_aggr.h"
 #include "queue.h"
+#include <linux/version.h>
 
 /* Default Linux bridge */
 static char hyfi_linux_bridge[IFNAMSIZ] = "";
@@ -525,6 +526,7 @@ static struct net_bridge_port *hyfi_bridge_get_dst_port(
 	struct net_hatbl_entry *ha = NULL;
 	struct net_hdtbl_entry *hd;
 	struct net_bridge_fdb_entry *dst;
+	bool ret;
 
 	/* First, look up in the H-Active table. If not exists, look up in
 	 * the H-Default table. Finally, if not in there, look up in the FDB. */
@@ -554,14 +556,23 @@ static struct net_bridge_port *hyfi_bridge_get_dst_port(
 	} else if ((hd = __hyfi_hdtbl_get(hyfi_br, dest_addr))) {
 		/* Create a new entry based on H-Default table */
 		return hyfi_bridge_handle_hd(hd, &skb, hash, traffic_class, priority);
-	} else if ((dst = os_br_fdb_get((struct net_bridge *)br, dest_addr)) && !dst->is_local) {
+	} else if ((dst = os_br_fdb_get((struct net_bridge *)br, dest_addr))) {
+		if(!dst) {
+			return NULL;
+		}
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0))
+		ret = test_bit(BR_FDB_LOCAL, &dst->flags);
+#else
+		ret = dst->is_local;
+#endif
+		if (!ret){
 		hyfi_hatbl_insert_from_fdb(hyfi_br, hash, dst->dst, src_addr,
 			dest_addr, br->dev->dev_addr,
 			traffic_class, priority, false /* keep_lock */);
 
 		return dst->dst;
+		}
 	}
-
 	return NULL;
 }
 
@@ -584,6 +595,7 @@ static struct net_bridge_port *hyfi_bridge_get_dst_port_no_hash(
 {
 	struct net_hdtbl_entry *hd;
 	struct net_bridge_fdb_entry *dst;
+	bool is_local;
 
 	hd = __hyfi_hdtbl_get(hyfi_br, addr);
 	if (hd) {
@@ -603,7 +615,15 @@ static struct net_bridge_port *hyfi_bridge_get_dst_port_no_hash(
 		}
 	} else {
 		dst = os_br_fdb_get((struct net_bridge *)br, addr);
-		if (dst && !dst->is_local) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0))
+	if(dst)
+	is_local = test_bit(BR_FDB_LOCAL, &dst->flags);
+#else
+	if(dst)
+	is_local = dst->is_local;
+#endif
+
+		if (dst && !(is_local)) {
 			DEBUG_TRACE("%02x:%02x:%02x:%02x:%02x:%02x: Match in "
 				"FDB, sending on port %s\n",
 				addr[0], addr[1], addr[2],
@@ -663,6 +683,22 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 			*/
 			src_addr = eth_hdr(*skb)->h_source;
 			dest_addr = eth_hdr(*skb)->h_dest;
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0))
+			if ((dst = os_br_fdb_get((struct net_bridge *)br, dest_addr)) &&
+				test_bit(BR_FDB_LOCAL, &dst->flags)) {
+				if ((hsrc = os_br_fdb_get((struct net_bridge *)br, src_addr)) &&
+					test_bit(BR_FDB_LOCAL, &hsrc->flags)) {
+					hyfi_ieee1905_frame_filter(*skb, (*skb)->dev);
+					skb2 = skb_clone(*skb, GFP_ATOMIC);
+					if (skb2) {
+						skb2->dev = hyfi_br->dev;
+						netif_receive_skb(skb2);
+					}
+					return NULL;
+				}
+			}
+#else
 			if ((dst = os_br_fdb_get((struct net_bridge *)br, dest_addr)) &&
 				dst->is_local) {
 				if ((hsrc = os_br_fdb_get((struct net_bridge *)br, src_addr)) &&
@@ -676,6 +712,7 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 					return NULL;
 				}
 			}
+#endif
 		}
 	}
 

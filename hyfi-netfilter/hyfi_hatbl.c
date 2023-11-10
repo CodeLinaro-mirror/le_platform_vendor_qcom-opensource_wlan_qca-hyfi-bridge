@@ -544,8 +544,18 @@ struct net_hatbl_entry * hyfi_hatbl_create_tracked_entry(
 {
 	struct net_hatbl_entry *ha;
 	struct net_bridge_fdb_entry *dst = os_br_fdb_get(netdev_priv(br->dev), da);
+	bool ret;
+	if (!dst ) {
+		return NULL;
+	}
 
-	if (!dst || dst->is_local) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0))
+	ret = test_bit(BR_FDB_LOCAL, &dst->flags);
+#else
+	ret = dst->is_local;
+#endif
+
+	if (ret) {
 		return NULL;
 	}
 
@@ -569,8 +579,16 @@ struct net_hatbl_entry * hyfi_hatbl_create_aggr_entry(
 {
 	struct net_hatbl_entry *ha;
 	struct net_bridge_fdb_entry *dst = os_br_fdb_get(netdev_priv(br->dev), da);
-
-	if (!dst || (((seq >> 14) & 3) == 0) || dst->is_local) {
+	bool ret;
+	if (!dst ) {
+		return NULL;
+	}
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0))
+	ret = test_bit(BR_FDB_LOCAL, &dst->flags);
+#else
+	ret = dst->is_local;
+#endif
+	if ((((seq >> 14) & 3) == 0) || ret) {
 		return NULL ;
 	}
 

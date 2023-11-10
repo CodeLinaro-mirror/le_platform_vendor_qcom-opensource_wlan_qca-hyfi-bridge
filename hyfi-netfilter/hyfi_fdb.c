@@ -47,8 +47,13 @@ static inline unsigned long hold_time(const struct net_bridge *br)
 static inline int has_expired(const struct net_bridge *br,
 		const struct net_bridge_fdb_entry *fdb)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0))
+	return !test_bit(BR_FDB_STATIC,&fdb->flags)
+			&& time_before_eq(hyfi_updated_time_get(fdb) + hold_time( br ), jiffies );
+#else
 	return !fdb->is_static
 			&& time_before_eq(hyfi_updated_time_get(fdb) + hold_time( br ), jiffies );
+#endif
 }
 
 void hyfi_fdb_perport(struct hyfi_net_bridge *hyfi_br,struct __switchport_index *pid)
@@ -83,6 +88,7 @@ int hyfi_fdb_fillbuf(struct net_bridge *br, void *buf, u_int32_t buf_len,
 	int ret = 0;
 	struct hlist_node *h;
 	struct net_bridge_fdb_entry *f;
+	bool fdb_flag;
 
 	memset(buf, 0, buf_len);
 	num_entries = buf_len / sizeof(struct __hfdb_entry);
@@ -125,8 +131,15 @@ int hyfi_fdb_fillbuf(struct net_bridge *br, void *buf, u_int32_t buf_len,
 			fe->ifindex = f->dst->dev->ifindex & 0xff;
 			fe->ifindex_hi = (f->dst->dev->ifindex >> 8) & 0xff;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0))
+			fe->is_local = test_bit(BR_FDB_LOCAL, &f->flags);
+			fdb_flag = test_bit(BR_FDB_STATIC, &f->flags);
+#else
 			fe->is_local = f->is_local;
-			if (!f->is_static)
+			fdb_flag = f->is_static;
+#endif
+
+			if (!fdb_flag)
 				fe->ageing_timer_value = jiffies_to_clock_t(
 						jiffies - hyfi_updated_time_get(f));
 			++fe;

@@ -244,10 +244,15 @@ unsigned int hyfi_netfilter_local_out_hook(unsigned int hooknum,
 			return NF_ACCEPT;
 		}
 
-
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0))
+		if ((hsrc = os_br_fdb_get((struct net_bridge *)br, src_addr)) &&
+			test_bit(BR_FDB_LOCAL,&hsrc->flags) && is_multicast_ether_addr(dest_addr) &&
+			!strcmp(br_port->dev->name, hyfi_br->colocatedIfName)) {
+#else
 		if ((hsrc = os_br_fdb_get((struct net_bridge *)br, src_addr)) &&
 			hsrc->is_local && is_multicast_ether_addr(dest_addr) &&
 			!strcmp(br_port->dev->name, hyfi_br->colocatedIfName)) {
+#endif
 
 			hyfi_ieee1905_frame_filter(skb, skb->dev);
 			skb2 = skb_clone(skb, GFP_ATOMIC);

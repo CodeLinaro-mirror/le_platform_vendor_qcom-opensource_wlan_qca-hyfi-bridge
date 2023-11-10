@@ -91,6 +91,7 @@ static void mc_encap_hook(struct net_bridge *br,
 {
     struct net_bridge_port *pdst = NULL;
     struct net_bridge_fdb_entry *dst;
+    bool ret;
 
     if (!skb)
         goto out;
@@ -103,8 +104,15 @@ static void mc_encap_hook(struct net_bridge *br,
         goto out;
 
     if (pdst == NULL){
-        if ((dst = os_br_fdb_get((struct net_bridge *)br, eth_hdr(skb)->h_dest)) && !dst->is_local) {
-            pdst = dst->dst;
+	if ((dst = os_br_fdb_get((struct net_bridge *)br, eth_hdr(skb)->h_dest))) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0))
+		ret = test_bit(BR_FDB_LOCAL, &dst->flags);
+#else
+		ret = dst->is_local;
+#endif
+		if(dst && !ret) {
+			pdst = dst->dst;
+		}
         }
     }
 
