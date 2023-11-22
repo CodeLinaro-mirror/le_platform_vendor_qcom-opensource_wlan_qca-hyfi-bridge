@@ -248,7 +248,7 @@ unsigned int hyfi_netfilter_local_out_hook(unsigned int hooknum,
 			return NF_ACCEPT;
 		}
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0))
 		if ((hsrc = os_br_fdb_get((struct net_bridge *)br, src_addr)) &&
 			test_bit(BR_FDB_LOCAL,&hsrc->flags) && is_multicast_ether_addr(dest_addr) &&
 			!strcmp(br_port->dev->name, hyfi_br->colocatedIfName)) {

@@ -47,7 +47,7 @@ static inline unsigned long hold_time(const struct net_bridge *br)
 static inline int has_expired(const struct net_bridge *br,
 		const struct net_bridge_fdb_entry *fdb)
 {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0))
 	return !test_bit(BR_FDB_STATIC,&fdb->flags)
 			&& time_before_eq(hyfi_updated_time_get(fdb) + hold_time( br ), jiffies );
 #else
@@ -131,7 +131,7 @@ int hyfi_fdb_fillbuf(struct net_bridge *br, void *buf, u_int32_t buf_len,
 			fe->ifindex = f->dst->dev->ifindex & 0xff;
 			fe->ifindex_hi = (f->dst->dev->ifindex >> 8) & 0xff;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0))
 			fe->is_local = test_bit(BR_FDB_LOCAL, &f->flags);
 			fdb_flag = test_bit(BR_FDB_STATIC, &f->flags);
 #else

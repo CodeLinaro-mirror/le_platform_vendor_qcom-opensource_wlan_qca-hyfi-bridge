@@ -78,7 +78,7 @@ ccflags-y += -DHYFI_NF_DEBUG_LEVEL=1
 ccflags-y += -DHYFI_MC_DEBUG_LEVEL=1
 
 # Kernel module compilation - part 2
-ifneq ($(KERNELRELEASE),)
+ifneq ($(KERNELRELEASE),y)
 obj-m += $(TARGET).o
 
 # Target objects - add as many as required
@@ -103,7 +103,6 @@ $(TARGET)-objs += \
 	$(HYFI_NF)/hyfi_aggr.o \
 	$(HYFI_NF)/hyfi_ecm.o \
 	$(HYFI_MC)/mc_ecm.o
-
 
 endif
 
