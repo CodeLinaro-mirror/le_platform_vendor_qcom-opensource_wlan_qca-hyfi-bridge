@@ -175,7 +175,11 @@ unsigned int hyfi_netfilter_forwarding_hook(unsigned int hooknum,
 	if (likely(!hyfi_bridge_is_fwmode_mcast_only(hyfi_br))) {
 		/* Should deliver */
 		if (!hyfi_bridge_should_deliver(hyfi_src_p, hyfi_dst_p, skb)) {
-		    return NF_DROP;
+			if (unlikely(eth_hdr(skb)->h_proto == htons(ETH_P_ARP))) {
+				/* accept if the packet is arp */
+				return NF_ACCEPT;
+			}
+			return NF_DROP;
 		}
 
 		/* Should flood */
@@ -409,6 +413,10 @@ unsigned int hyfi_netfilter_pre_routing_hook(unsigned int hooknum,
 	if (likely(!hyfi_bridge_is_fwmode_mcast_only(hyfi_br))) {
 		if ((dst = os_br_fdb_get(br_port->br, eth_hdr(skb)->h_source))) {
 			if (!hyfi_fdb_should_update(hyfi_br, br_port, dst->dst)) {
+				if (unlikely(eth_hdr(skb)->h_proto == htons(ETH_P_ARP))) {
+					/* accept if the packet is arp */
+					return NF_ACCEPT;
+				}
 				/* Drop packet, do not update fdb */
 				return NF_DROP;
 			}
