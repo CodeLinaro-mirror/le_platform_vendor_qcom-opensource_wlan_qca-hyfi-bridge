@@ -321,12 +321,10 @@ struct hyfi_net_bridge_port *hyfi_bridge_get_port_by_dev(const struct net_device
 		return NULL;
 
 	if ( strlen(dev->name) == 0 ) {
-		DEBUG_ERROR("%s: WARNING: iface name is empty\n", __func__);
 		return NULL;
 	}
 
 	if ( dev->priv_flags ==  0) {
-		DEBUG_ERROR("%s: WARNING: flag is empty for %s \n", __func__, dev->name);
 		return NULL;
 	}
 
