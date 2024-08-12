@@ -52,8 +52,8 @@ void hyfi_netlink_fini(void);
  * ==============================================================*/
 #define MAP_PKG_NAME "easymesh"
 #define MAP_MAJOR_VERION    12
-#define MAP_MINOR_VERION    1
-#define MAP_COMPATIBILITY   1
+#define MAP_MINOR_VERION    5
+#define MAP_COMPATIBILITY   2
 #define MAP_SU_BUILD        0
 
 /* character length assumption :
