@@ -42,9 +42,9 @@ static inline int hyfi_br_pass_frame_up(struct sk_buff *skb)
 
         u64_stats_update_begin(&brstats->syncp);
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6,1,0))
-        u64_stats_inc(&brstats->rx_packets);
-        u64_stats_add(&brstats->rx_bytes,skb->len);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0))
+        u64_stats_inc((u64_stats_t *)&brstats->rx_packets);
+        u64_stats_add((u64_stats_t *)&brstats->rx_bytes,skb->len);
 #else
         brstats->rx_packets++;
         brstats->rx_bytes += skb->len;
