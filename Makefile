@@ -9,7 +9,7 @@
 ################################################################################
 
 # Target module name
-TARGET := hyfi-bridging
+TARGET := hyfi-bridging-mcc
 
 # Kernel directory - This works only for the host.
 # The target kernel is different, and it can't be detected.
