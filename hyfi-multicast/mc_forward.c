@@ -105,7 +105,7 @@ static void mc_encap_hook(struct net_bridge *br,
 
     if (pdst == NULL){
 	if ((dst = os_br_fdb_get((struct net_bridge *)br, eth_hdr(skb)->h_dest))) {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0)) || defined (BUILD_YOCTO)
 		ret = test_bit(BR_FDB_LOCAL, &dst->flags);
 #else
 		ret = dst->is_local;

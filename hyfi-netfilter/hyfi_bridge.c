@@ -558,7 +558,7 @@ static struct net_bridge_port *hyfi_bridge_get_dst_port(
 		if(!dst) {
 			return NULL;
 		}
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0)) || defined (BUILD_YOCTO)
 		ret = test_bit(BR_FDB_LOCAL, &dst->flags);
 #else
 		ret = dst->is_local;
@@ -613,7 +613,7 @@ static struct net_bridge_port *hyfi_bridge_get_dst_port_no_hash(
 		}
 	} else {
 		dst = os_br_fdb_get((struct net_bridge *)br, addr);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0)) || defined (BUILD_YOCTO)
 	if(dst)
 	is_local = test_bit(BR_FDB_LOCAL, &dst->flags);
 #else
@@ -682,7 +682,7 @@ struct net_bridge_port *hyfi_bridge_get_dst(const struct net_bridge_port *src,
 			src_addr = eth_hdr(*skb)->h_source;
 			dest_addr = eth_hdr(*skb)->h_dest;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0)) || defined (BUILD_YOCTO)
 			if ((dst = os_br_fdb_get((struct net_bridge *)br, dest_addr)) &&
 				test_bit(BR_FDB_LOCAL, &dst->flags)) {
 				if ((hsrc = os_br_fdb_get((struct net_bridge *)br, src_addr)) &&
