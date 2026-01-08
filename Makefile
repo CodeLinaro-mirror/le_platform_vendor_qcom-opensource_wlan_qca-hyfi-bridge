@@ -43,6 +43,7 @@ export EXTRA_CFLAGS += $(INCLUDES)
 
 ifeq ($(CONFIG_BUILD_YOCTO),y)
 EXTRA_CFLAGS += $(HYFI_CFLAGS)
+ccflags-y+=-DBUILD_YOCTO
 endif
 
 # Module extra compilation flags

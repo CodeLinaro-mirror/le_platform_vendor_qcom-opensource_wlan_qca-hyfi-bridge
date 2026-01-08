@@ -549,7 +549,7 @@ struct net_hatbl_entry * hyfi_hatbl_create_tracked_entry(
 		return NULL;
 	}
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0)) || defined (BUILD_YOCTO)
 	ret = test_bit(BR_FDB_LOCAL, &dst->flags);
 #else
 	ret = dst->is_local;
@@ -583,7 +583,7 @@ struct net_hatbl_entry * hyfi_hatbl_create_aggr_entry(
 	if (!dst ) {
 		return NULL;
 	}
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0)) || defined (BUILD_YOCTO)
 	ret = test_bit(BR_FDB_LOCAL, &dst->flags);
 #else
 	ret = dst->is_local;

@@ -164,7 +164,7 @@ static int hyfi_ecm_new_connection(struct hyfi_net_bridge *hyfi_br,
 
 			dst = os_br_fdb_get(netdev_priv(br_dev), da);
 			/* Try and insert from FDB */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,14,0)) || defined (BUILD_YOCTO)
 			if(dst)
 			ret = test_bit(BR_FDB_LOCAL, &dst->flags);
 #else
