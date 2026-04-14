@@ -1012,9 +1012,9 @@ static int hyfi_bridge_init_bridge_device(struct hyfi_net_bridge *hyfi_br, const
 	/* Init ports */
 	hyfi_bridge_ports_init(hyfi_br, br_dev);
 	rcu_assign_pointer(hyfi_br->dev, br_dev);
+#ifndef DISABLE_APS_HOOKS
 	/* see br_input.c */
 	rcu_assign_pointer(br_get_dst_hook, hyfi_bridge_get_dst);
-#ifndef DISABLE_APS_HOOKS
 
 	/* see br_if.c */
 	rcu_assign_pointer(br_port_dev_get_hook, hyfi_bridge_port_dev_get);
