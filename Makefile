@@ -110,4 +110,7 @@ endif
 build:
 	@$(MAKE) -C $(KERNEL_SRC) M=$(M) V=1 modules
 
+clean:
+	$(MAKE) -C $(KERNEL_SRC) M=$(M) clean
+
 endif
